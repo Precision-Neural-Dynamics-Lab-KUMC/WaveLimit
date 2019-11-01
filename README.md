@@ -12,7 +12,7 @@ Available here:
 Code to Read and Write NeuroExplorer Data Files, Matlab code to read and write .nex and .nex5 files
 https://www.neuroexplorer.com/downloadspage/
 
-*NOTE, the writeNexFile function does not create files that read into Plexon Offline Sorter the same as the native export/import .NEX in Plexon 
+*NOTE, the writeNexFile function does not create files that read into Plexon Offline Sorter the same as the native export/import .NEX in Plexon. 
 A modified writeNexFile.m is included with WaveLimit that is recommended for use with Plexon Offline Sorter.  
 Simply replace writeNexFile.m in the HowToReadAndWriteNexAndNex5FilesInMatlab directory. 
 
