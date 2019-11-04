@@ -70,7 +70,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         
         %Number of waveforms that are closest to each cluster center, only
         %these waveforms could potentially be in that cluster
-        num_possible_waveforms = histcounts(min_d, [0.5, (1:length(unique(min_d)))+0.5]);
+        num_possible_waveforms = histcounts(min_d, [0.5, (1:size(test_mean_waveforms,2))+0.5]);
         num_possible_waveforms(num_possible_waveforms == num_waveforms) = num_waveforms-1;  %To prevent a later error when there's only one cluster
         [sorted_distances, sort_order] = sort(pen_distances,2);  %Sort the pen_distances to order waveforms by their distance from the test spike template
         cluster_order = gpuArray.zeros(size(sorted_distances));
@@ -88,7 +88,11 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         %peak of chi^2 pdf)
         min_point = gpuArray.zeros(size(num_possible_waveforms));
             for n = 1:size(smooth_diff_sorted_distances,1)
+                if num_possible_waveforms(n)>0
                 [~, min_point(n)] = min(smooth_diff_sorted_distances(n,1:num_possible_waveforms(n)));
+                else
+                    min_point(n) = 0;
+                end
             end
         
         min_point = min([num_possible_waveforms./2; min_point]);  %Make sure that it at most includes only half of all possible waveforms (real waveforms + outliers) for this cluster
@@ -143,11 +147,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             [~, sort_index] = sort(distances(n,:));
             sorted_dist_for_cluster = distances(:,sort_index);
             sorted_dist_for_cluster(sorted_dist_for_cluster==0) = eps;  %Can't have distance be equal to zero for chi2pdf
-            try
-                chi2_pdf = chi2pdf(sorted_dist_for_cluster.*repmat(chi2_sf',1,size(distances,2)),28);
-            catch
-                5+5
-            end
+            chi2_pdf = chi2pdf(sorted_dist_for_cluster.*repmat(chi2_sf',1,size(distances,2)),28);
             chi2_pdf = chi2_pdf.*repmat(spike_prior',[1,size(chi2_pdf,2)]);
             cumsum_chi2_pdf = cumsum(chi2_pdf,2);
             fract_true_chi2(n,:) = cumsum_chi2_pdf(n,:)./sum(cumsum_chi2_pdf,1);

@@ -86,7 +86,11 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         %peak of chi^2 pdf)
         min_point = zeros(size(num_possible_waveforms));
             for n = 1:size(smooth_diff_sorted_distances,1)
-                [~, min_point(n)] = min(smooth_diff_sorted_distances(n,1:num_possible_waveforms(n)));
+                if num_possible_waveforms(n)>0
+                    [~, min_point(n)] = min(smooth_diff_sorted_distances(n,1:num_possible_waveforms(n)));
+                else
+                    min_point(n) = 0;
+                end
             end
         
         min_point = min([num_possible_waveforms./2; min_point]);  %Make sure that it at most includes only half of all possible waveforms (real waveforms + outliers) for this cluster
@@ -140,6 +144,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         for n = 1:size(test_mean_waveforms,2)
             [~, sort_index] = sort(distances(n,:));
             sorted_dist_for_cluster = distances(:,sort_index);
+            sorted_dist_for_cluster(sorted_dist_for_cluster==0) = eps;  %Can't have distance be equal to zero for chi2pdf
             chi2_pdf = chi2pdf(sorted_dist_for_cluster.*repmat(chi2_sf',1,size(distances,2)),28);
             chi2_pdf = chi2_pdf.*repmat(spike_prior',[1,size(chi2_pdf,2)]);
             cumsum_chi2_pdf = cumsum(chi2_pdf,2);
