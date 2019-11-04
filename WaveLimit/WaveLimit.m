@@ -252,6 +252,8 @@ for ch = 1:max_channels   %length(channels_to_sort)
                             waveform_assignments{ch}(waveform_assignments{ch}==unique_cluster_indexes(u)) = 0;
                             currSNR = -1;
                         end
+                    else
+                        currSNR = 100;  %Make large so comparison with options.SNR_minimum is always true
                     end
                     if currSNR>=options.SNR_minimum && (options.remove_long_interval_units || options.remove_line_noise_units)
                         curr_diff_timestamps = diff(sort(timestamps(waveform_assignments{ch}==unique_cluster_indexes(u))));
