@@ -60,18 +60,17 @@ if plx_file_flag
     if options.keep_analog
         [n, samplecounts] = plx_adchan_samplecounts(input_data_file);
         [n, names] = plx_adchan_names(input_data_file);
-        %[n,gains] = plx_adchan_gains(input_data_file);
         ch_with_data = find(samplecounts>0);
         for ch = 1:length(ch_with_data)
             [adfreq, n, ts, fn, ad] = plx_ad_v(input_data_file, ch_with_data(ch)-1);
-            new_nexFileData.contvars{ch}.name = names(ch_with_data(ch),:);
-            new_nexFileData.contvars{ch}.varVersion = 200;
-            new_nexFileData.contvars{ch}.ADtoMV = 0.0024;  %Not sure how to calculate this from the gains in the plexon file so just use one default value for now
-            new_nexFileData.contvars{ch}.MVOfffset = 0;
-            new_nexFileData.contvars{ch}.ADFrequency = adfreq;
-            new_nexFileData.contvars{ch}.timestamps = ts;
-            new_nexFileData.contvars{ch}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];
-            new_nexFileData.contvars{ch}.data = ad;
+            nexFileData.contvars{ch}.name = names(ch_with_data(ch),:);
+            nexFileData.contvars{ch}.varVersion = 200;
+            nexFileData.contvars{ch}.ADtoMV = 
+            nexFileData.contvars{ch}.MVOfffset = 0;
+            nexFileData.contvars{ch}.ADFrequency = adfreq;
+            nexFileData.contvars{ch}.timestamps = ts;
+            nexFileData.contvars{ch}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];
+            nexFileData.contvars{ch}.data = ad;
         end
     end
     

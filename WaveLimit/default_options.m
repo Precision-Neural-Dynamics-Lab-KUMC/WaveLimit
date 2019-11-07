@@ -26,7 +26,7 @@ sorting_options.use_existing_clusters = false;  %True: Sort with centers defined
 sorting_options.keep_unsorted_ch_assignments = true; %True: Keep sorting assignments in output file of channels not sorted with WaveLimit call, False: make all waveforms in 
 sorting_options.keep_zero_clusters = false;  %Keep units in file even if they have zero spikes because didn't mean sort criteria, Mainly for use_existing_clusters = true
 sorting_options.repeatable_random_seed = 33;  %if a value: repeatable-random numbers with same seed, if 0: each run is truly random
-
+sorting_options.keep_analog = true;   %Keep analog channel data in .nex output file
 if gpuDeviceCount>0
     sorting_options.use_gpu = true;
     try 
