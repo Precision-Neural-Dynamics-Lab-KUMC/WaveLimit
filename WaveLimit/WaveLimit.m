@@ -57,6 +57,7 @@ if plx_file_flag
     new_nexFileData.markers{1}.timestamps = markers_ts;
     unit_counter = 1;
     total_time = FileDuration;
+    
 else
     nexFileData = readNexFile(input_data_file);
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed

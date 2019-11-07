@@ -63,6 +63,12 @@ function template_waveforms = find_cluster_ids_for_gpu(waveforms, timestamps, op
     sample_dist(751:1000,:,2) = exp(-0.5 * ((  sample_dist(751:1000,:,2)  )./large_sigma).^2) ./ (sqrt(2*pi) .* large_sigma);
     sample_dist(isnan(sample_dist(:,1,1)),:,1) = 0;
     sample_dist(isnan(sample_dist(:,1,2)),:,2) = 0.001; %Make small number rather than 0 to avoid divide by zero
+    
+    [uniq_rand_sample, uniq_rand_sample_i] = unique(rand_sample);  %Make sure there's no duplicates of waveforms in the random sample
+    if length(uniq_rand_sample)<1000
+        rand_sample = rand_sample(uniq_rand_sample_i);
+        sample_dist = sample_dist(uniq_rand_sample_i,:,:);
+    end
 
 
     sample_dist_ratio = sum(sample_dist(:,:,1),2)./sum(sample_dist(:,:,2),2);
