@@ -64,20 +64,19 @@ if plx_file_flag
         ch_with_data = find(samplecounts>0);
         for ch = 1:length(ch_with_data)
             [adfreq, n, ts, fn, ad] = plx_ad_v(input_data_file, ch_with_data(ch)-1);
-            new_nexFileData.contvars{ch}.name = names(ch_with_data(ch),:);
-            new_nexFileData.contvars{ch}.varVersion = 200;
-            new_nexFileData.contvars{ch}.ADtoMV = 0.0024;  %Not sure how to calculate this from the gains in the plexon file so just use one default value for now
-            new_nexFileData.contvars{ch}.MVOfffset = 0;
-            new_nexFileData.contvars{ch}.ADFrequency = adfreq;
-            new_nexFileData.contvars{ch}.timestamps = ts;
-            new_nexFileData.contvars{ch}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];
-            new_nexFileData.contvars{ch}.data = ad;
+            new_nexFileData.contvars{ch,1}.name = names(ch_with_data(ch),:);
+            new_nexFileData.contvars{ch,1}.varVersion = 200;
+            new_nexFileData.contvars{ch,1}.ADtoMV = 0.0024;  %Not sure how to calculate this from the gains in the plexon file so just use one default value for now
+            new_nexFileData.contvars{ch,1}.MVOfffset = 0;
+            new_nexFileData.contvars{ch,1}.ADFrequency = adfreq;
+            new_nexFileData.contvars{ch,1}.timestamps = ts;
+            new_nexFileData.contvars{ch,1}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];
+            new_nexFileData.contvars{ch,1}.data = ad;
         end
     end
     
 else
-     nexFileData =  readNexFile('R:\SOM RSCH\RouseLab\DataFiles\Project_Data\20191029_WaveLimit\nex_file_testing\plx_to_nex_export.nex');
-        nexFileData = readNexFile(input_data_file);
+    nexFileData = readNexFile(input_data_file);
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed
     nex_file_unit_numbers = cellfun(@(x) x.unitNumber, nexFileData.neurons);
     unique_chan_numbers = unique(nex_file_chan_numbers);
