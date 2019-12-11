@@ -57,24 +57,23 @@ if plx_file_flag
     new_nexFileData.markers{1}.timestamps = markers_ts;
     unit_counter = 1;
     total_time = FileDuration;
-    if options.keep_analog
-        [n, samplecounts] = plx_adchan_samplecounts(input_data_file);
-        [n, names] = plx_adchan_names(input_data_file);
-        %[n,gains] = plx_adchan_gains(input_data_file);
-        ch_with_data = find(samplecounts>0);
-        for ch = 1:length(ch_with_data)
-            [adfreq, n, ts, fn, ad] = plx_ad_v(input_data_file, ch_with_data(ch)-1);
-            new_nexFileData.contvars{ch,1}.name = names(ch_with_data(ch),:);
-            new_nexFileData.contvars{ch,1}.varVersion = 200;
-            new_nexFileData.contvars{ch,1}.ADtoMV = 0.0024;  %Not sure how to calculate this from the gains in the plexon file so just use one default value for now
-            new_nexFileData.contvars{ch,1}.MVOfffset = 0;
-            new_nexFileData.contvars{ch,1}.ADFrequency = adfreq;
-            new_nexFileData.contvars{ch,1}.timestamps = ts;
-            new_nexFileData.contvars{ch,1}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];
-            new_nexFileData.contvars{ch,1}.data = ad;
-        end
-    end
-    
+    if options.keep_analog	
+        [n, samplecounts] = plx_adchan_samplecounts(input_data_file);	
+        [n, names] = plx_adchan_names(input_data_file);	
+        %[n,gains] = plx_adchan_gains(input_data_file);	
+        ch_with_data = find(samplecounts>0);	
+        for ch = 1:length(ch_with_data)	
+            [adfreq, n, ts, fn, ad] = plx_ad_v(input_data_file, ch_with_data(ch)-1);	
+            new_nexFileData.contvars{ch,1}.name = names(ch_with_data(ch),:);	
+            new_nexFileData.contvars{ch,1}.varVersion = 200;	
+            new_nexFileData.contvars{ch,1}.ADtoMV = 0.0024;  %Not sure how to calculate this from the gains in the plexon file so just use one default value for now	
+            new_nexFileData.contvars{ch,1}.MVOfffset = 0;	
+            new_nexFileData.contvars{ch,1}.ADFrequency = adfreq;	
+            new_nexFileData.contvars{ch,1}.timestamps = ts;	
+            new_nexFileData.contvars{ch,1}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];	
+            new_nexFileData.contvars{ch,1}.data = ad;	
+        end	
+    end	
 else
     nexFileData = readNexFile(input_data_file);
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed
@@ -123,21 +122,21 @@ for ch = 1:max_channels   %length(channels_to_sort)
     
     if plx_file_flag  %If we're reading in a plexon file, then we always have to read in the data to write to nex
         curr_units = find(tscounts(:,ch+1)>0)-1;
-            unit_counts = sum(tscounts(:,ch+1));
-            waveforms = zeros(unit_counts,num_time_pts);
-            timestamps = zeros(unit_counts,1);
-            cluster_indexes = zeros(unit_counts,1);
-            for u = 1:length(curr_units)
-                curr_range = [sum(tscounts(1:curr_units(u),ch+1))+1,sum(tscounts(1:(curr_units(u)+1),ch+1))];
-                [~, ~, timestamps(curr_range(1):curr_range(2)), waveforms(curr_range(1):curr_range(2),:)] = plx_waves_v(input_data_file, ch, curr_units(u));
-                cluster_indexes(curr_range(1):curr_range(2)) = (u-1)*ones(curr_range(2)-curr_range(1)+1,1);
-            end
-            waveforms = waveforms';
-            [timestamps, sort_i] = sort(timestamps);  %Make sure time stamps are sorted
-            waveforms = waveforms(:,sort_i);
-            if options.use_existing_clusters
-                cluster_indexes = cluster_indexes(sort_i);
-            end
+        unit_counts = sum(tscounts(:,ch+1));
+        waveforms = zeros(unit_counts,num_time_pts);
+        timestamps = zeros(unit_counts,1);
+        cluster_indexes = zeros(unit_counts,1);
+        for u = 1:length(curr_units)
+            curr_range = [sum(tscounts(1:curr_units(u),ch+1))+1,sum(tscounts(1:(curr_units(u)+1),ch+1))];
+            [~, ~, timestamps(curr_range(1):curr_range(2)), waveforms(curr_range(1):curr_range(2),:)] = plx_waves_v(input_data_file, ch, curr_units(u));
+            cluster_indexes(curr_range(1):curr_range(2)) = (u-1)*ones(curr_range(2)-curr_range(1)+1,1);
+        end
+        waveforms = waveforms';
+        [timestamps, sort_i] = sort(timestamps);  %Make sure time stamps are sorted
+        waveforms = waveforms(:,sort_i);
+        if options.use_existing_clusters
+            cluster_indexes = cluster_indexes(sort_i);
+        end
     end
     
     if (ismember(ch, channels_to_sort) || ~options.keep_unsorted_ch_assignments)  %If it's a channel to sort or remove previous sorting, then read in waveforms
@@ -174,19 +173,35 @@ for ch = 1:max_channels   %length(channels_to_sort)
             ISI_viol = 1000*ISI<options.max_ISI;
             ISI_viol = [false; ISI_viol] | [ISI_viol; false];
             num_ISI_viol = sum(ISI_viol);
-            if num_ISI_viol < (max_waveforms/2)
+            % Edit by ZL on 2019-11-20. added a rare condition when num_ISI_legit < (max_waveforms/2)
+                % Rare condition for Q_20181012_EFYZABCD_plx2_filterOn channel 100
+            % size(ISI_viol)=[102781,1], nnz(ISI_viol)=num_ISI_viol=54824, nnz(~ISI_viol)=num_ISI_legit=47957,max_waveforms/2=50000
+            % Error using randperm, during 'rand_i = rand_i(randperm(length(rand_i), floor(max_waveforms/2)));'
+                % which is essentially trying to do randperm(47957, 50000)
+            num_ISI_legit = sum(~ISI_viol);
+            if num_ISI_viol < (max_waveforms/2)  
+                % when num_ISI_viol < max_waveforms/2, include all ISI_viol waveforms, select portion of ISI_legit
                 rand_i = find(~ISI_viol);
                 rand_i = rand_i(randperm(length(rand_i),max_waveforms-num_ISI_viol));
                 rand_i = sort([rand_i; find(ISI_viol)]);
                 tot_spikes = length(ISI_viol);
+            elseif num_ISI_legit < (max_waveforms/2)  
+                % when num_ISI_legit < max_waveforms/2, include all ISO_viol waveforms, select portion of ISI_viol
+                    % very vare occurence
+                warning('Rare condition when num_ISI_legit<max_waveforms/2, while sum(unit_counts) > max_waveforms')
+                ISI_viol_i = find(ISI_viol);
+                ISI_viol_i = ISI_viol_i(randperm(length(ISI_viol_i), max_waveforms-num_ISI_legit));
+                rand_i = sort([ISI_viol_i; find(~ISI_viol)]);
+                tot_spikes = length(ISI_viol);
             else
+                % when both ISI_viol and ISI_legit > max_waveforms/2, make rand_i half ISI violate half not
                 rand_i = find(~ISI_viol);
                 if ~isempty(rand_i)  %Prevent error in very rare occurence when all ISIs are less than options.max_ISI
-                rand_i = rand_i(randperm(length(rand_i), floor(max_waveforms/2)));
-                ISI_viol_i = find(ISI_viol);
-                ISI_viol_i = ISI_viol_i(randperm(length(ISI_viol_i), floor(max_waveforms/2)));
-                rand_i = sort([rand_i; ISI_viol_i]);
-                tot_spikes = floor((max_waveforms/2)*length(ISI_viol)/sum(ISI_viol)); %Not the actual total number of spikes but keeps ratio of included ISI violations to tot_spikes the same
+                    rand_i = rand_i(randperm(length(rand_i), floor(max_waveforms/2)));
+                    ISI_viol_i = find(ISI_viol);
+                    ISI_viol_i = ISI_viol_i(randperm(length(ISI_viol_i), floor(max_waveforms/2)));
+                    rand_i = sort([rand_i; ISI_viol_i]);
+                    tot_spikes = floor((max_waveforms/2)*length(ISI_viol)/sum(ISI_viol)); %Not the actual total number of spikes but keeps ratio of included ISI violations to tot_spikes the same
                 else
                     rand_i = sort(ISI_viol_i);
                 end
@@ -233,7 +248,7 @@ for ch = 1:max_channels   %length(channels_to_sort)
         if options.use_gpu
             [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_gpu(aligned_waveforms(:,rand_i), 1000*timestamps(rand_i), mean_waveforms, options, 1000*total_time, tot_spikes);  %Call main clustering function
         else
-            [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_cpu(aligned_waveforms(:,rand_i), 1000*timestamps(rand_i), mean_waveforms, options, 1000*total_time, tot_spikes); new_nexFileData %Call main clustering function
+            [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_cpu(aligned_waveforms(:,rand_i), 1000*timestamps(rand_i), mean_waveforms, options, 1000*total_time, tot_spikes);  %Call main clustering function
         end
         if size(test_mean_waveforms,2)>0  %If there were cluster centers found
             if ~options.keep_zero_clusters
@@ -465,7 +480,18 @@ for k = 1:length(new_nexFileData.neurons)
     new_nexFileData.neurons{k}.name((end+1):64) = 0;  %Add null character to name to make 64 character string padded by nulls, important for reading back into plexon offline sorter
     new_nexFileData.waves{k}.name((end+1):64) = 0;
 end
-writeNexFile(new_nexFileData, output_data_file);
+if strcmp(output_data_file(end-4:end), '.nex5')  % save to nex5 file if assigned to, ZL 2019-11-24
+    writeNex5File(new_nexFileData, output_data_file);
+else
+    writeNexFile(new_nexFileData, output_data_file);
+    s = dir(output_data_file);
+    if s.bytes/1024^3 >= 2  % save to .nex5 file if output .nex file >2GB
+        warning('output sorted .nex file greater than 2GB, data for last few channels unreliable')
+        output_data_file = [output_data_file '5'];
+        disp(['Save a .nex5 file: ' output_data_file] )
+        writeNex5File(new_nexFileData, output_data_file);
+    end
+end
 
 toc
 end
