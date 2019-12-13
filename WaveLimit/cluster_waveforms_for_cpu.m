@@ -68,7 +68,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         
         %Number of waveforms that are closest to each cluster center, only
         %these waveforms could potentially be in that cluster
-        num_possible_waveforms = histcounts(min_d, [0.5, (1:length(unique(min_d)))+0.5]);
+        num_possible_waveforms = histcounts(min_d, [0.5, (1:size(test_mean_waveforms,2))+0.5]);
         num_possible_waveforms(num_possible_waveforms == num_waveforms) = num_waveforms-1;  %To prevent a later error when there's only one cluster
         [sorted_distances, sort_order] = sort(pen_distances,2);  %Sort the pen_distances to order waveforms by their distance from the test spike template
         cluster_order = zeros(size(sorted_distances));
