@@ -7,14 +7,14 @@ An example call script is provided:  WaveLimit_example_call_script.m
 options can be specified in the options structure after it is created with default_options.m
 
 To use WaveLimit, you must have the following package:
-HowToReadAndWriteNexAndNex5FilesInMatlab from NeuroExplorer
+HowToReadAndWriteNexAndNex5FilesInMatlab (Version Oct. 2019) from NeuroExplorer
 Available here:  
 Code to Read and Write NeuroExplorer Data Files, Matlab code to read and write .nex and .nex5 files
 https://www.neuroexplorer.com/downloadspage/
 
-*NOTE, the writeNexFile function does not create files that read into Plexon Offline Sorter the same as the native export/import .NEX in Plexon. 
-A modified writeNexFile.m is included with WaveLimit that is recommended for use with Plexon Offline Sorter.  
-Simply replace writeNexFile.m in the HowToReadAndWriteNexAndNex5FilesInMatlab directory. 
+*NOTE, the writeNexFile function does not create files that read into Plexon Offline Sorter the same as the native export/import .NEX/.NEX5 in Plexon. 
+Modified writeNexFile.m and writeNex5File.m are included with WaveLimit that are recommended for use with Plexon Offline Sorter.  
+Simply replace writeNexFile.m and writeNex5File.m in the HowToReadAndWriteNexAndNex5FilesInMatlab directory. 
 
 To run, WaveLimit and HowToReadAndWriteNexAndNex5FilesInMatlab must be on your Matlab path.
 You can either add it permanantly or include it using the example calls in WaveLimit_example_call_script.m
