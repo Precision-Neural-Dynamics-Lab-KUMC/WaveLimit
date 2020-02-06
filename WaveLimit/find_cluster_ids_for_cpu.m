@@ -63,7 +63,12 @@ function template_waveforms = find_cluster_ids_for_cpu(waveforms, timestamps, op
     sample_dist(isnan(sample_dist(:,1,1)),:,1) = 0;
     sample_dist(isnan(sample_dist(:,1,2)),:,2) = 0.001; %Make small number rather than 0 to avoid divide by zero
 
-
+    [uniq_rand_sample, uniq_rand_sample_i] = unique(rand_sample);  %Make sure there's no duplicates of waveforms in the random sample
+    if length(uniq_rand_sample)<1000
+        rand_sample = rand_sample(uniq_rand_sample_i);
+        sample_dist = sample_dist(uniq_rand_sample_i,:,:);
+    end
+    
     sample_dist_ratio = sum(sample_dist(:,:,1),2)./sum(sample_dist(:,:,2),2);
     
     [sort_dist, sort_i] = sort(sample_dist_ratio, 'descend', 'MissingPlacement', 'last');
@@ -141,7 +146,20 @@ function template_waveforms = find_cluster_ids_for_cpu(waveforms, timestamps, op
     end
     end
     
-    
+    %Test if number of units is greater than max_units_per_ch to keep from
+    %having too many units on a channel, errors occur if unit names are
+    %greater the 26 letters of the alphabet, default max is 20- AGR, 1/30/20
+    if length(test_template_units) > options.max_units_per_ch
+        %Count waveforms close to each test waveform template, keep only
+        %those with the most adjacent waveforms - AGR, 1/30/20
+        dist_cutoff = prctile(reshape(sample_dist(test_template_units,1:10:end,1),[],1), 100*(1-50/num_waveforms));
+        spike_counts = zeros(length(test_template_units),1);
+        for n = 1:length(test_template_units)
+            spike_counts(n) = sum(sample_dist(sort_i(test_template_units(n)),:,1)>dist_cutoff );
+        end
+        [~,sort_spike_counts_i] = sort(spike_counts, 'descend');
+        test_template_units = test_template_units(sort_spike_counts_i(1:options.max_units_per_ch));
+    end
 
        template_waveforms = zeros(size(waveforms,1),length(test_template_units));
       for n = 1:length(test_template_units)

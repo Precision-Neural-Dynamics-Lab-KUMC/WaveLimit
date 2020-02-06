@@ -70,6 +70,12 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         %these waveforms could potentially be in that cluster
         num_possible_waveforms = histcounts(min_d, [0.5, (1:size(test_mean_waveforms,2))+0.5]);
         num_possible_waveforms(num_possible_waveforms == num_waveforms) = num_waveforms-1;  %To prevent a later error when there's only one cluster
+        %Calculate distance from a flat signal of zeros, no spikes farther
+        %away then this should be included
+        max_distances = sqrt(sum((test_mean_waveforms.^2)));
+        for n = 1:length(num_possible_waveforms)
+            num_possible_waveforms(n) = min(num_possible_waveforms(n), sum(pen_distances(n,:)<max_distances(n)));
+        end
         [sorted_distances, sort_order] = sort(pen_distances,2);  %Sort the pen_distances to order waveforms by their distance from the test spike template
         cluster_order = zeros(size(sorted_distances));
         for n = 1:size(test_mean_waveforms,2)
@@ -112,8 +118,13 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             %Do least squared curve fitting to scale the distance
             %values expected for each cumulative probability
             if round(length(x_values)/100)>1
-                [x,~] = lsqcurvefit(chi2fun, [sorted_distances(n,est_25th(n))./chi2inv(.25, num_time_pts), 1], x_values(1:round(length(x_values)/100):end), y_values(1:round(length(x_values)/100):end), [0 0], [Inf Inf], options); %, options);
-                chi2_sf(n) = x(1);
+                try
+                    [x,~] = lsqcurvefit(chi2fun, [chi2inv(.25, num_time_pts)./sorted_distances(n,est_25th(n)), 1], x_values(1:round(length(x_values)/100):end), y_values(1:round(length(x_values)/100):end), [0 0], [1e10 1e10], options); %, options);
+                    chi2_sf(n) = x(1);
+                catch
+                    disp('lsqfit failure')
+                    chi2_sf(n) = chi2inv(.25, num_time_pts)./gather(sorted_distances(n,est_25th(n)));
+                end
             else
                 chi2_sf(n) = 1000;
             end
