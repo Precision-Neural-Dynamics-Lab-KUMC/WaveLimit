@@ -42,7 +42,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             keep_iterating = false;
         end
         
-        
+       
         % %              Calculate the Euclidean distance to
         distances = sqrt(sum((repmat(permute(waveforms, [3 2 1]), [size(test_mean_waveforms,2),1,1]) - repmat(permute(test_mean_waveforms, [2 3 1]), [1,size(waveforms,2),1])).^2,3));
         %             distances(end+1,:) = sqrt(sum((permute(waveforms, [3 2 1]) - repmat(permute(noise_waveform, [2 3 1]), [1,size(waveforms,2),1])).^2,3)); %Also calculate the distance from the smallest amplitude waveform so waveforms closest to this noise is not included in calculating the covariance matrix below
@@ -55,6 +55,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         % %                 distances(n,:) = sum((differences/cov_matrix{n}).*differences,2); %Calculate the Mahalanobis distance
         %                 distances(n,:) = sqrt(sum(differences.^2,2));
         %             end
+        
         
         
         pen_value = ceil(max(distances(:)));
@@ -72,7 +73,12 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         %these waveforms could potentially be in that cluster
         num_possible_waveforms = histcounts(min_d, [0.5, (1:size(test_mean_waveforms,2))+0.5]);
         num_possible_waveforms(num_possible_waveforms == num_waveforms) = num_waveforms-1;  %To prevent a later error when there's only one cluster
-        
+        %Calculate distance from a flat signal of zeros, no spikes farther
+        %away then this should be included
+        max_distances = sqrt(sum((test_mean_waveforms.^2)));
+        for n = 1:length(num_possible_waveforms)
+            num_possible_waveforms(n) = min(num_possible_waveforms(n), sum(pen_distances(n,:)<max_distances(n)));
+        end
         %Note orginally used the following but something weird happened
         %where sort_order values were not unique for a given row
         %[sorted_distances, sort_order] = sort(pen_distances,2)
@@ -120,8 +126,13 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             %Do least squared curve fitting to scale the distance
             %values expected for each cumulative probability
             if round(length(x_values)/100)>1
-                [x,~] = lsqcurvefit(chi2fun, [gather(sorted_distances(n,est_25th(n))./chi2inv(.25, num_time_pts)), 1], gather(x_values(1:round(length(x_values)/100):end)), gather(y_values(1:round(length(x_values)/100):end)), [0 0], [Inf Inf], options); %, options);
-                chi2_sf(n) = x(1);
+                try
+                    [x,~] = lsqcurvefit(chi2fun, [chi2inv(.25, num_time_pts)./gather(sorted_distances(n,est_25th(n))), 1], gather(x_values(1:round(length(x_values)/100):end)), gather(y_values(1:round(length(x_values)/100):end)), [0 0], [1e10 1e10], options); %, options);
+                    chi2_sf(n) = x(1);
+                catch
+                    disp('lsqfit failure')
+                    chi2_sf(n) = chi2inv(.25, num_time_pts)./gather(sorted_distances(n,est_25th(n)));
+                end
             else
                 chi2_sf(n) = 1000;
             end

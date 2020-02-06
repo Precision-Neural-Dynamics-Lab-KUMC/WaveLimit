@@ -16,6 +16,7 @@ sorting_options.min_num_in_cluster = 500;  %Minimum number of waveforms needed i
 sorting_options.throwout_nle_outliers = true; %Throw out nonlinear energy outliers if true
 sorting_options.update_percentage = 10;  %Update factor for how far to move central waveform from ISI violation causing waveforms 
 sorting_options.align_waveforms = true;  %temporally align waveforms around peak or trough of waveform if true 
+sorting_options.max_units_per_ch = 20;    %Maximum units that can be identified and sorted on a channel
 sorting_options.max_iterations = 30;
 sorting_options.max_multi_iterations = 3;
 sorting_options.use_existing_clusters = false;

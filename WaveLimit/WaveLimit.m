@@ -8,10 +8,8 @@ function WaveLimit(input_data_file,output_data_file,options,channels_to_sort, st
 % options - spike sorting options (Default, options from function: default_options)
 % channels_to_sort - list of channels to be sorted (1 indexed) (Default, all channels)
 % strobeInfo - trial start and end event codes, necessary if only spikes during trials is included to accurately estimate the total time of the file
-% Adam Rouse 10/25/19, v1.1
+% Adam Rouse 1/30/20, v1.2
 
-
-% TODO if only 1 waveform then perform_spike_align_cpu crashes
 
 
 if ~exist('writeNexFile', 'file')
@@ -226,7 +224,11 @@ for ch = 1:max_channels   %length(channels_to_sort)
         end
         
         if options.use_existing_clusters
-            unique_cluster_indexes = nex_file_unit_numbers(ch_indexes);
+            if plx_file_flag
+                unique_cluster_indexes = find(tscounts(:,1+ch)>0)-1; % make 0 unsorted (rather than 1)
+            else
+                unique_cluster_indexes = nex_file_unit_numbers(ch_indexes);
+            end
             unique_cluster_indexes = unique_cluster_indexes(unique_cluster_indexes~=0);
             mean_waveforms = zeros(size(aligned_waveforms,1),length(unique_cluster_indexes));
             for u = 1:length(unique_cluster_indexes)
