@@ -1,6 +1,8 @@
 function template_waveforms = find_cluster_ids_for_cpu(waveforms, timestamps, options, tot_spikes)
-% find_cluster_ids for WaveLimit, v1.1
-% Adam Rouse, 11/1/19
+% find_cluster_ids for WaveLimit, v1.2
+% Adam Rouse, 4/23/20
+
+
 
 %      %Make sure waveforms are sorted in order by time
      [timestamps,sort_i] = sort(timestamps,'ascend'); 
@@ -169,5 +171,5 @@ function template_waveforms = find_cluster_ids_for_cpu(waveforms, timestamps, op
     else
         template_waveforms = [];
     end
-      
+     
     
