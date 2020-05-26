@@ -1,23 +1,28 @@
 function template_waveforms = find_cluster_ids_for_gpu(waveforms, timestamps, options, tot_spikes)
-% find_cluster_ids for WaveLimit, v1.1
-% Adam Rouse, 11/1/19
+% find_cluster_ids for WaveLimit, v1.2
+% Adam Rouse, 4/23/20
 
 %      %Make sure waveforms are sorted in order by time
     timestamps = gpuArray(timestamps);
      [timestamps,sort_i] = sort(timestamps,'ascend'); 
      waveforms =  gpuArray(waveforms(:,sort_i));
      num_waveforms = size(waveforms,2);
-    
-    if num_waveforms>1000
+    noise_level = std(waveforms(1,:));
+    if num_waveforms>1000 && noise_level>0
         %Perform pca, used since pca has no gpuArray support, note-sign
         %convention of native pca function is not enforced since it's
         %irrelevent
        
-        [U,sigma] = svd(bsxfun(@minus,waveforms,nanmean(waveforms,2))', 'econ');
-        pca_score =  bsxfun(@times,U,diag(sigma)');
         
-    noise_level = std(waveforms(1,:));  %Use first time sample (a time before threshold crossing) to estimate noise
+        scale_factor = 0.02/noise_level; %This is a hack as this code should be independent of the scale of the waveforms but there's an issue
+        %TODO check why cluster identification isn't magnitude independent
+        waveforms = scale_factor*waveforms;
+        noise_level = std(waveforms(1,:));  %Use first time sample (a time before threshold crossing) to estimate noise
     
+    
+    [U,sigma] = svd(bsxfun(@minus,waveforms,nanmean(waveforms,2))', 'econ');
+        pca_score =  bsxfun(@times,U,diag(sigma)');
+
    
     min_ISI = .675;
     small_sigma = 1.0*noise_level;
@@ -168,9 +173,10 @@ function template_waveforms = find_cluster_ids_for_gpu(waveforms, timestamps, op
         template_waveforms(:,n) = gather(mean(waveforms(:, sample_dist(sort_i(test_template_units(n)),:,1)>prctile(sample_dist(sort_i(test_template_units(n)),:,1), 100*(1-50/num_waveforms))),2));
     end
     
-    
+    template_waveforms = template_waveforms/scale_factor;
     else
         template_waveforms = [];
     end
+    
     
     
