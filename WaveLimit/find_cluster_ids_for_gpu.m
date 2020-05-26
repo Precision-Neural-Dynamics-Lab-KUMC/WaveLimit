@@ -1,5 +1,5 @@
 function template_waveforms = find_cluster_ids_for_gpu(waveforms, timestamps, options, tot_spikes)
-% find_cluster_ids for WaveLimit, v1.2
+% find_cluster_ids for WaveLimit, v1.3
 % Adam Rouse, 4/23/20
 
 %      %Make sure waveforms are sorted in order by time

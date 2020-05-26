@@ -1,5 +1,5 @@
 function new_waveforms = perform_spike_alignment_for_gpu(waveforms)
-% perform_spike_alignment for WaveLimit, v1.2
+% perform_spike_alignment for WaveLimit, v1.3
 % Adam Rouse, 4/24/20
 % function for aligning spikes based on the peak or trough of the spike
 % waveforms
