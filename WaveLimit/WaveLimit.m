@@ -8,8 +8,7 @@ function WaveLimit(input_data_file,output_data_file,options,channels_to_sort, st
 % options - spike sorting options (Default, options from function: default_options)
 % channels_to_sort - list of channels to be sorted (1 indexed) (Default, all channels)
 % strobeInfo - trial start and end event codes, necessary if only spikes during trials is included to accurately estimate the total time of the file
-% Adam Rouse 1/30/20, v1.2
-
+% Adam Rouse 4/24/20, v1.3
 
 
 if ~exist('writeNexFile', 'file')
@@ -19,14 +18,21 @@ end
 
 if ~isempty(regexpi(input_data_file, '\.nex'))
     plx_file_flag = 0;
+    nev_file_flag = 0;
 elseif ~isempty(regexpi(input_data_file, '\.plx')) || ~isempty(regexpi(input_data_file, '\.pl2'))
     plx_file_flag = 1;
+    nev_file_flag = 0;
+elseif ~isempty(regexpi(input_data_file, '\.nev')) 
+    plx_file_flag = 0;
+    nev_file_flag = 1;
 end
 
 tic
 if ~exist('output_data_file', 'var') || isempty(output_data_file)
     if plx_file_flag
         output_data_file = [input_data_file(1:(regexpi(input_data_file, '\.plx')-1)), '_sorted.nex'];
+    elseif nev_file_flag
+        output_data_file = [input_data_file(1:(regexpi(input_data_file, '\.nev')-1)), '_sorted.nex'];
     else
         output_data_file = [input_data_file(1:(regexpi(input_data_file, '\.nex')-1)), '_sorted.nex'];
     end
@@ -55,6 +61,7 @@ if plx_file_flag
     new_nexFileData.markers{1}.timestamps = markers_ts;
     unit_counter = 1;
     total_time = FileDuration;
+    %Include analog data
     if options.keep_analog	
         [n, samplecounts] = plx_adchan_samplecounts(input_data_file);	
         [n, names] = plx_adchan_names(input_data_file);	
@@ -72,9 +79,40 @@ if plx_file_flag
             new_nexFileData.contvars{ch,1}.data = ad;	
         end	
     end	
+elseif nev_file_flag
+    if ~exist('openNEV', 'file')
+        error('AGRCodeError:pathError', 'No openNEV.m found, add NPMK-4.5.*.* to path')
+    end
+    nevFileData = openNEV(input_data_file, 'noread', 'nosave', 'nomat');  %There seem to be issues with event codes and reading from .mat file, for safety for now only read from original file and don't read data just to get events
+    sample_freq = nevFileData.MetaTags.SampleRes;
+    new_nexFileData = create_blank_nex();
+    new_nexFileData.freq =  nevFileData.MetaTags.TimeRes;
+    unit_counter = 1;
+    new_nexFileData.markers{1}.name = 'events';
+    new_nexFileData.markers{1}.varVarsion = 100;
+    new_nexFileData.markers{1}.values{1}.name = 'event_codes';
+    new_nexFileData.markers{1}.values{1}.strings = arrayfun(@(x) num2str(x), nevFileData.Data.SerialDigitalIO.UnparsedData, 'Uni', false);
+    new_nexFileData.markers{1}.timestamps = nevFileData.Data.SerialDigitalIO.TimeStampSec';
+%     ch_with_data = unique(nevFileData.Data.Spikes.Electrode);
+%     for ch = 1:length(ch_with_data)
+%         new_nexFileData.contvars{ch,1}.name = ['sig', num2str(nevFileData.MetaTags.ChannelID(ch_with_data(ch)),'%03d'), 'U'];	
+%             new_nexFileData.contvars{ch,1}.varVersion = 200;	
+%             new_nexFileData.contvars{ch,1}.ADtoMV = 0.0024;  %Not sure how to calculate this from the gains in the plexon file so just use one default value for now	
+%             new_nexFileData.contvars{ch,1}.MVOfffset = 0;	
+%             new_nexFileData.contvars{ch,1}.ADFrequency = nevFileData.MetaTags.SampleRes;	
+%             new_nexFileData.contvars{ch,1}.timestamps = ts;	
+%             new_nexFileData.contvars{ch,1}.fragmentStarts = [1 cumsum(fn(1:(end-1)))];	
+%             new_nexFileData.contvars{ch,1}.data = ad;
+%     end
+    max_channels = max(nevFileData.Data.Spikes.Electrode);
+    total_time = nevFileData.MetaTags.DataDurationSec;
+    new_nexFileData.tend = total_time;
+    new_nexFileData.contvars = {};
+    nevFileData = openNEV(input_data_file, 'nosave', 'nomat');  %Read for getting spike datanow
 else
     nexFileData = readNexFile(input_data_file);
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed
+    nex_file_chanName_numbers = cellfun(@(x) str2double(x.name(regexp(x.name,'\d'))), nexFileData.neurons);
     nex_file_unit_numbers = cellfun(@(x) x.unitNumber, nexFileData.neurons);
     unique_chan_numbers = unique(nex_file_chan_numbers);
     num_time_pts = size(nexFileData.waves{1}.waveforms,1);
@@ -115,10 +153,11 @@ else
     %     zero_unit_channels = zeros(size(nex_file_chan_numbers));  %Will label which units had zero waveforms assigned
 end
 
-max_waveforms = 100000;
+% max_waveforms = 100000;
+max_waveforms = 50000;
 for ch = 1:max_channels   %length(channels_to_sort)
     
-    if plx_file_flag  %If we're reading in a plexon file, then we always have to read in the data to write to nex
+    if plx_file_flag  %If we're reading in a plexon or nev file, then we always have to read in the data to write to nex
         curr_units = find(tscounts(:,ch+1)>0)-1;
         unit_counts = sum(tscounts(:,ch+1));
         waveforms = zeros(unit_counts,num_time_pts);
@@ -135,13 +174,28 @@ for ch = 1:max_channels   %length(channels_to_sort)
         if options.use_existing_clusters
             cluster_indexes = cluster_indexes(sort_i);
         end
+        curr_ch_name = channel_names(ch,:);
+    elseif nev_file_flag
+        curr_spikes_i = nevFileData.Data.Spikes.Electrode == ch;
+        waveforms = double(nevFileData.Data.Spikes.Waveform(:,curr_spikes_i));
+        unit_counts = size(waveforms,2);
+        timestamps = double(nevFileData.Data.Spikes.TimeStamp(curr_spikes_i))'/double(nevFileData.MetaTags.SampleRes);
+        if options.use_existing_clusters
+            cluster_indexes = nevFileData.Data.Spikes.Unit(curr_spikes_i);
+        end
+        curr_ch_name = ['sig', num2str(ch,'%03d')];
+    else %nex file
+        ch_indexes = find(nex_file_chan_numbers == ch);
+        curr_ch_name = ['sig', num2str(nex_file_chanName_numbers(ch_indexes(1)),'%03d')];
     end
     
     if (ismember(ch, channels_to_sort) || ~options.keep_unsorted_ch_assignments)  %If it's a channel to sort or remove previous sorting, then read in waveforms
-        if ~plx_file_flag  %If it is a nex file, read in data for sorting
+        if ~plx_file_flag && ~nev_file_flag %If it is a nex file, read in data for sorting
             ch_indexes = find(nex_file_chan_numbers == ch);
+            if diff(nex_file_chanName_numbers(ch_indexes)) ~= 0 
+                warning('Warning, the names (sig001U,a,b...) of the neurons with the same wireNumber do not have the same channel in their name!')
+            end
             unit_counts = cellfun(@(x) size(x.waveforms,2),nexFileData.waves(ch_indexes));
-            %         if sum(unit_counts)<= max_waveforms
             waveforms = zeros(num_time_pts,sum(unit_counts));
             timestamps = zeros(sum(unit_counts),1);
             if options.use_existing_clusters
@@ -212,8 +266,9 @@ for ch = 1:max_channels   %length(channels_to_sort)
     end
     if ismember(ch, channels_to_sort)
         display(['Sorting ch: ' num2str(ch)])
+        if sum(unit_counts)>0  %Sort if there are waveforms to sort
         if options.align_waveforms
-            if options.use_gpu
+            if options.use_gpu &&  7 * (8*numel(waveforms)) < options.max_gpu_memory  %Test to prevent out of memory error on GPU #bytes equal 8 (for double) x num elements, about 7x needed than waveform size, TODO break alignment into chunks to use gpu
                 aligned_waveforms = perform_spike_alignment_for_gpu(waveforms);
                 aligned_waveforms = gather(aligned_waveforms);
             else
@@ -226,6 +281,8 @@ for ch = 1:max_channels   %length(channels_to_sort)
         if options.use_existing_clusters
             if plx_file_flag
                 unique_cluster_indexes = find(tscounts(:,1+ch)>0)-1; % make 0 unsorted (rather than 1)
+            elseif nev_file_flag
+                unique_cluster_indexes = unique(cluster_indexes);
             else
                 unique_cluster_indexes = nex_file_unit_numbers(ch_indexes);
             end
@@ -241,6 +298,9 @@ for ch = 1:max_channels   %length(channels_to_sort)
                 mean_waveforms = find_cluster_ids_for_cpu(aligned_waveforms(:,rand_i), timestamps(rand_i), options, tot_spikes);
             end
         end
+        else
+            mean_waveforms = [];
+        end
     else
         mean_waveforms = [];
     end
@@ -249,6 +309,7 @@ for ch = 1:max_channels   %length(channels_to_sort)
     if size(mean_waveforms,2)>0  %If there were cluster centers found
         if options.use_gpu
             [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_gpu(aligned_waveforms(:,rand_i), 1000*timestamps(rand_i), mean_waveforms, options, 1000*total_time, tot_spikes);  %Call main clustering function
+            test_mean_waveforms = gather(test_mean_waveforms);
         else
             [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_cpu(aligned_waveforms(:,rand_i), 1000*timestamps(rand_i), mean_waveforms, options, 1000*total_time, tot_spikes);  %Call main clustering function
         end
@@ -323,25 +384,38 @@ for ch = 1:max_channels   %length(channels_to_sort)
             
                 
                 for u = 1:length(unique_cluster_indexes)
-                    if plx_file_flag
-                        if unique_cluster_indexes(u) == 0
-                            new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), 'U'];
-                        else
-                            new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), char(96+unique_cluster_indexes(u))];
-                        end
+                    if unique_cluster_indexes(u) == 0
+                        new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, 'U'];
                     else
-                        if unique_cluster_indexes(u) == 0
-                            new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), 'U'];
-                        else
-                            new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), char(96+unique_cluster_indexes(u))];
-                        end
+                        new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, char(96+unique_cluster_indexes(u))];
                     end
+%                     if plx_file_flag
+%                         if unique_cluster_indexes(u) == 0
+%                             new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), 'U'];
+%                         else
+%                             new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), char(96+unique_cluster_indexes(u))];
+%                         end
+%                     elseif nev_file_flag
+%                         if unique_cluster_indexes(u) == 0
+%                             new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), 'U'];
+%                         else
+%                             new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), char(96+unique_cluster_indexes(u))];
+%                         end
+%                     else %nex input file
+%                         if unique_cluster_indexes(u) == 0
+%                             new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(nex_file_chanName_numbers(ch_indexes(1)),'%03d'), 'U']; 
+%                         else
+%                             new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(nex_file_chanName_numbers(ch_indexes(1)),'%03d'), char(96+unique_cluster_indexes(u))];
+%                         end
+%                     end
                     new_nexFileData.neurons{unit_counter,1}.varVersion = 101;
+%                     new_nexFileData.neurons{unit_counter,1}.wireNumber = nex_file_chanName_numbers(ch_indexes(1))-1;
                     new_nexFileData.neurons{unit_counter,1}.wireNumber = ch-1;
                     new_nexFileData.neurons{unit_counter,1}.unitNumber = unique_cluster_indexes(u);
                     new_nexFileData.neurons{unit_counter,1}.xPos = 0;
                     new_nexFileData.neurons{unit_counter,1}.yPos = 0;
                     new_nexFileData.neurons{unit_counter,1}.timestamps = timestamps(waveform_assignments{ch}==unique_cluster_indexes(u));
+                    
                     
                     new_nexFileData.waves{unit_counter,1}.name = [new_nexFileData.neurons{unit_counter,1}.name, '_wf'];
                     new_nexFileData.waves{unit_counter,1}.varVersion = new_nexFileData.neurons{unit_counter,1}.varVersion;
@@ -355,6 +429,10 @@ for ch = 1:max_channels   %length(channels_to_sort)
                     if plx_file_flag
                         new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
                         new_nexFileData.waves{unit_counter,1}.ADtoMV = SpikePeakV/((2^(SpikeADResBits-1))*ChGains(ch));
+                    elseif nev_file_flag 
+                        new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
+                        new_nexFileData.waves{unit_counter,1}.ADtoMV = 6e-5;
+                        new_nexFileData.waves{unit_counter,1}.waveforms = new_nexFileData.waves{unit_counter,1}.waveforms.*new_nexFileData.waves{unit_counter,1}.ADtoMV;
                     else
                         new_nexFileData.waves{unit_counter,1}.WFrequency = nexFileData.waves{ch_indexes(1),1}.WFrequency;
                         new_nexFileData.waves{unit_counter,1}.ADtoMV = nexFileData.waves{ch_indexes(1),1}.ADtoMV;
@@ -364,7 +442,7 @@ for ch = 1:max_channels   %length(channels_to_sort)
             
         else
             %All waveforms assigned to unsorted
-            new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), 'U'];
+            new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, 'U'];
             new_nexFileData.neurons{unit_counter,1}.varVersion = 101;
             new_nexFileData.neurons{unit_counter,1}.wireNumber = ch-1;
             new_nexFileData.neurons{unit_counter,1}.unitNumber = 0;
@@ -375,12 +453,22 @@ for ch = 1:max_channels   %length(channels_to_sort)
             new_nexFileData.waves{unit_counter,1}.name = [new_nexFileData.neurons{unit_counter,1}.name, '_wf'];
             new_nexFileData.waves{unit_counter,1}.varVersion = new_nexFileData.neurons{unit_counter,1}.varVersion;
             new_nexFileData.waves{unit_counter,1}.NPointsWave = size(waveforms,1);
+            new_nexFileData.waves{unit_counter,1}.wireNumber = new_nexFileData.neurons{unit_counter,1}.wireNumber;
+            new_nexFileData.waves{unit_counter,1}.unitNumber = new_nexFileData.neurons{unit_counter,1}.unitNumber;
+            
+            new_nexFileData.waves{unit_counter,1}.MVOffset = 0;
+            new_nexFileData.waves{unit_counter,1}.timestamps = new_nexFileData.neurons{unit_counter,1}.timestamps;
+            new_nexFileData.waves{unit_counter,1}.waveforms = waveforms;
+            
             if ~isempty(ch_indexes)
                 if plx_file_flag
                     new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
                     new_nexFileData.waves{unit_counter,1}.ADtoMV = SpikePeakV/((2^(SpikeADResBits-1))*ChGains(ch));
+                elseif nev_file_flag
+                    new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
+                    new_nexFileData.waves{unit_counter,1}.ADtoMV = 6e-5;
+                    new_nexFileData.waves{unit_counter,1}.waveforms = new_nexFileData.waves{unit_counter,1}.waveforms.*new_nexFileData.waves{unit_counter,1}.ADtoMV;
                 else
-                    
                     new_nexFileData.waves{unit_counter,1}.WFrequency = nexFileData.waves{ch_indexes(1),1}.WFrequency;
                     new_nexFileData.waves{unit_counter,1}.ADtoMV = nexFileData.waves{ch_indexes(1),1}.ADtoMV;
                 end
@@ -388,27 +476,22 @@ for ch = 1:max_channels   %length(channels_to_sort)
                 new_nexFileData.waves{unit_counter,1}.WFrequency = nexFileData.waves{1,1}.WFrequency;
                 new_nexFileData.waves{unit_counter,1}.ADtoMV = nexFileData.waves{1,1}.ADtoMV;
             end
-            new_nexFileData.waves{unit_counter,1}.wireNumber = new_nexFileData.neurons{unit_counter,1}.wireNumber;
-            new_nexFileData.waves{unit_counter,1}.unitNumber = new_nexFileData.neurons{unit_counter,1}.unitNumber;
             
-            new_nexFileData.waves{unit_counter,1}.MVOffset = 0;
-            new_nexFileData.waves{unit_counter,1}.timestamps = new_nexFileData.neurons{unit_counter,1}.timestamps;
-            new_nexFileData.waves{unit_counter,1}.waveforms = waveforms;
             unit_counter = unit_counter+1;
         end
         
         
     else   %if size(mean_waveforms,2)>0, no waveforms, don't assign new sortings
      
-        if options.keep_unsorted_ch_assignments  %Use previous sortings
+        if options.keep_unsorted_ch_assignments && sum(unit_counts)>0 %Use previous sortings
             if plx_file_flag
                 curr_orig_units = unique(cluster_indexes);
                 waveform_assignments{ch} = cluster_indexes;
                 for u = curr_orig_units'
                     if u == 0
-                        new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), 'U'];
+                        new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, 'U'];
                     else
-                        new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), char(96+u)];
+                        new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, char(96+u)];
                     end
                     new_nexFileData.neurons{unit_counter,1}.varVersion = 101;
                     new_nexFileData.neurons{unit_counter,1}.wireNumber = ch-1;
@@ -431,6 +514,38 @@ for ch = 1:max_channels   %length(channels_to_sort)
                     
                     unit_counter = unit_counter+1;
                 end
+            elseif nev_file_flag
+                curr_ch_spikes = nevFileData.Data.Spikes.Electrode==ch;
+                curr_orig_units = unique(nevFileData.Data.Spikes.Unit(curr_ch_spikes));
+                for u = curr_orig_units
+                    curr_spikes_index =  curr_ch_spikes & nevFileData.Data.Spikes.Unit == u;
+                    if u == 0
+                        new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, 'U'];
+                    else
+                        new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, char(96+u)];
+                    end
+                    new_nexFileData.neurons{unit_counter,1}.varVersion = 101;
+                    new_nexFileData.neurons{unit_counter,1}.wireNumber = ch-1;
+                    new_nexFileData.neurons{unit_counter,1}.unitNumber = u;
+                    new_nexFileData.neurons{unit_counter,1}.xPos = 0;
+                    new_nexFileData.neurons{unit_counter,1}.yPos = 0;
+                    new_nexFileData.neurons{unit_counter,1}.timestamps = double(nevFileData.Data.Spikes.TimeStamp(curr_spikes_i))'/double(nevFileData.MetaTags.SampleRes);   
+                    
+                    new_nexFileData.waves{unit_counter,1}.name = [new_nexFileData.neurons{unit_counter,1}.name, '_wf'];
+                    new_nexFileData.waves{unit_counter,1}.varVersion = new_nexFileData.neurons{unit_counter,1}.varVersion;
+                    new_nexFileData.waves{unit_counter,1}.NPointsWave = size(waveforms,1);
+                    
+                    new_nexFileData.waves{unit_counter,1}.wireNumber = new_nexFileData.neurons{unit_counter,1}.wireNumber;
+                    new_nexFileData.waves{unit_counter,1}.unitNumber = new_nexFileData.neurons{unit_counter,1}.unitNumber;
+                    new_nexFileData.waves{unit_counter,1}.MVOffset = 0;
+                    new_nexFileData.waves{unit_counter,1}.timestamps = new_nexFileData.neurons{unit_counter,1}.timestamps;
+                    new_nexFileData.waves{unit_counter,1}.ADtoMV = 6e-05;
+                    new_nexFileData.waves{unit_counter,1}.waveforms = double(nevFileData.Data.Spikes.Waveform(:,curr_spikes_i)).*new_nexFileData.waves{unit_counter,1}.ADtoMV;
+                    new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
+                    
+                    
+                    unit_counter = unit_counter+1;
+                end
             else
                 curr_orig_units = find(orig_nexFileData_chans==ch);
                 for u = curr_orig_units'
@@ -440,9 +555,18 @@ for ch = 1:max_channels   %length(channels_to_sort)
                 end
             end
         else  %All waveforms assigned to unsorted
-            new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), 'U'];
+            new_nexFileData.neurons{unit_counter,1}.name = [curr_ch_name, 'U']; 
+%             if plx_file_flag
+%                  new_nexFileData.neurons{unit_counter,1}.name = [channel_names(ch,:), 'U'];
+%             elseif nev_file_flag
+%                  new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(ch,'%03d'), 'U'];
+%             else %nex input file
+%                  new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(nex_file_chanName_numbers(ch_indexes(1)),'%03d'), 'U']; 
+%             end
+%             curr_orig_units = find(orig_nexFileData_chans==ch);
+%             new_nexFileData.neurons{unit_counter,1}.name = ['sig', num2str(nex_file_chanName_numbers(curr_orig_units(1)),'%03d'), 'U'];
             new_nexFileData.neurons{unit_counter,1}.varVersion = 101;
-            new_nexFileData.neurons{unit_counter,1}.wireNumber = ch-1;
+            new_nexFileData.neurons{unit_counter,1}.wireNumber = ch-1;  %nex_file_chanName_numbers(curr_orig_units(1))-1;
             new_nexFileData.neurons{unit_counter,1}.unitNumber = 0;
             new_nexFileData.neurons{unit_counter,1}.xPos = 0;
             new_nexFileData.neurons{unit_counter,1}.yPos = 0;
@@ -451,10 +575,19 @@ for ch = 1:max_channels   %length(channels_to_sort)
             new_nexFileData.waves{unit_counter,1}.name = [new_nexFileData.neurons{unit_counter,1}.name, '_wf'];
             new_nexFileData.waves{unit_counter,1}.varVersion = new_nexFileData.neurons{unit_counter,1}.varVersion;
             new_nexFileData.waves{unit_counter,1}.NPointsWave = size(waveforms,1);
-           
+            new_nexFileData.waves{unit_counter,1}.wireNumber = new_nexFileData.neurons{unit_counter,1}.wireNumber;
+            new_nexFileData.waves{unit_counter,1}.unitNumber = new_nexFileData.neurons{unit_counter,1}.unitNumber;
+            
+            new_nexFileData.waves{unit_counter,1}.MVOffset = 0;
+            new_nexFileData.waves{unit_counter,1}.timestamps = new_nexFileData.neurons{unit_counter,1}.timestamps;
+            new_nexFileData.waves{unit_counter,1}.waveforms = waveforms;
             if plx_file_flag
                 new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
                 new_nexFileData.waves{unit_counter,1}.ADtoMV = SpikePeakV/((2^(SpikeADResBits-1))*ChGains(ch));
+            elseif nev_file_flag
+                new_nexFileData.waves{unit_counter,1}.WFrequency = sample_freq;
+                new_nexFileData.waves{unit_counter,1}.ADtoMV = 6e-05;
+                new_nexFileData.waves{unit_counter,1}.waveforms = new_nexFileData.waves{unit_counter,1}.waveforms.*new_nexFileData.waves{unit_counter,1}.ADtoMV;
             else
                 if ~isempty(ch_indexes)
                     new_nexFileData.waves{unit_counter,1}.WFrequency = nexFileData.waves{ch_indexes(1),1}.WFrequency;
@@ -465,12 +598,7 @@ for ch = 1:max_channels   %length(channels_to_sort)
                     new_nexFileData.waves{unit_counter,1}.ADtoMV = nexFileData.waves{1,1}.ADtoMV;
                 end
             end
-            new_nexFileData.waves{unit_counter,1}.wireNumber = new_nexFileData.neurons{unit_counter,1}.wireNumber;
-            new_nexFileData.waves{unit_counter,1}.unitNumber = new_nexFileData.neurons{unit_counter,1}.unitNumber;
             
-            new_nexFileData.waves{unit_counter,1}.MVOffset = 0;
-            new_nexFileData.waves{unit_counter,1}.timestamps = new_nexFileData.neurons{unit_counter,1}.timestamps;
-            new_nexFileData.waves{unit_counter,1}.waveforms = waveforms;
             unit_counter = unit_counter+1;
         end
         
@@ -494,7 +622,6 @@ else
         writeNex5File(new_nexFileData, output_data_file);
     end
 end
-
 toc
 end
 

@@ -1,6 +1,6 @@
 function [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_cpu(waveforms, timestamps, mean_waveforms, sorting_options, T, total_spikes)
 % function cluster_waveforms(waveforms, timestamps, mean_waveforms, sorting_options)
-% Adam Rouse, 11/1/19, v1.1
+% Adam Rouse, 4/24/20, v1.3
 
 if nargin<4
     sorting_options = default_options();

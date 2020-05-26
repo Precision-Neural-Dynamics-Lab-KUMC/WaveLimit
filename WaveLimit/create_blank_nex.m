@@ -1,6 +1,6 @@
 function nexFileData = create_blank_nex()
-%create_blank_nex for WaveLimit v1.1
-% Adam Rouse, 11/1/19
+%create_blank_nex for WaveLimit v1.3
+% Adam Rouse, 4/23/20
 
 nexFileData.version = 104;
 nexFileData.comment = char(zeros(1,0));
