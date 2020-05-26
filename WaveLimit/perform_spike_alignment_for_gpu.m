@@ -1,6 +1,6 @@
 function new_waveforms = perform_spike_alignment_for_gpu(waveforms)
-% perform_spike_alignment for WaveLimit, v1.1
-% Adam Rouse, 11/1/19
+% perform_spike_alignment for WaveLimit, v1.2
+% Adam Rouse, 4/24/20
 % function for aligning spikes based on the peak or trough of the spike
 % waveforms
 % INPUT: file_path, directory where .mat files created with
@@ -18,7 +18,7 @@ max_slide_samples = 2;          %Max number of samples that each waveform can be
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 g_waveforms = gpuArray(waveforms);
-    
+  
 if size(waveforms,2)>100  %Need a at least 100 spikes on the channel to do the alignment of spike snippets, smaller numbers cause errors and warnings
     
     n_samples = size(waveforms,1);
@@ -68,7 +68,8 @@ if size(waveforms,2)>100  %Need a at least 100 spikes on the channel to do the a
     new_waveforms = gpuArray(zeros(n_samples - 2*max_slide_samples, size(waveforms,2)));
     unique_offsets = unique(new_offset);
     for n = 1:length(unique_offsets)
-        if sum(unique_offsets(n)==new_offset)>1
+        %TODO see if this can be improved for speed
+        if sum(unique_offsets(n)==new_offset)>2 %If it's more than one waveform at the current offset,  we use interp2 on a matrix
             if mod(unique_offsets(n),1)==0  %If offset is an interger, don't have to interpolate
                 new_waveforms(:,unique_offsets(n)==new_offset) = g_waveforms(((1+max_slide_samples):(n_samples-max_slide_samples))+unique_offsets(n),unique_offsets(n)==new_offset);
             else
@@ -79,7 +80,7 @@ if size(waveforms,2)>100  %Need a at least 100 spikes on the channel to do the a
             yq = ((1+max_slide_samples):(n_samples-max_slide_samples))+unique_offsets(n);
             new_waveforms(:,unique_offsets(n)==new_offset) = interp1(waveforms(:,unique_offsets(n)==new_offset), yq, 'V5cubic');
         end
-    end
+    end 
 else
     new_waveforms = waveforms;
 end
