@@ -1,6 +1,6 @@
 function sorting_options = default_options()
 %Create default sorting options for WaveLimit, v1.1
-%Adam Rouse, 11/1/19
+%Adam Rouse, 4/23/20
 
 sorting_options.max_ISI = 1.5;  %Maximum Interspike Interval time to be considered a violation in ms
 sorting_options.include_multiunits = true;  %Keep units even if less than 1/2 waveforms appear to come from a single neuron
@@ -36,7 +36,8 @@ if gpuDeviceCount>0
         warning('There is a problem with the GPU device.  Using CPU instead')
         sorting_options.use_gpu = false;
     end
-        
+    gpu_info = gpuDevice;
+    sorting_options.max_gpu_memory = gpu_info.AvailableMemory;
 else
     sorting_options.use_gpu = false;
 end
