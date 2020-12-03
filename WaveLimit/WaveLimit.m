@@ -110,7 +110,12 @@ elseif nev_file_flag
     new_nexFileData.contvars = {};
     nevFileData = openNEV(input_data_file, 'nosave', 'nomat');  %Read for getting spike datanow
 else
-    nexFileData = readNexFile(input_data_file);
+    if ~isempty(regexpi(input_data_file, '\.nex5'))
+        nexFileData = readNex5File(input_data_file);
+    else
+        nexFileData = readNexFile(input_data_file);
+    end
+    
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed
     nex_file_chanName_numbers = cellfun(@(x) str2double(x.name(regexp(x.name,'\d'))), nexFileData.neurons);
     nex_file_unit_numbers = cellfun(@(x) x.unitNumber, nexFileData.neurons);
