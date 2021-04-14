@@ -3,7 +3,7 @@ function WaveLimit(input_data_file,output_data_file,options,channels_to_sort, st
 %channels_to_sort channel numbers that should be sorted - NOTE Must be 1
 %indexed from channels 1 to n NOT 0 to n-1
 %
-% input_data_file - .nex or .plx file to be sorted
+% input_data_file - .nex.plx or .nev file to be sorted
 % output_data_file - .nex file to write new sorting assignments (Default, add *_sorted.nex to input_data_file)
 % options - spike sorting options (Default, options from function: default_options)
 % channels_to_sort - list of channels to be sorted (1 indexed) (Default, all channels)
@@ -110,11 +110,11 @@ elseif nev_file_flag
     new_nexFileData.contvars = {};
     nevFileData = openNEV(input_data_file, 'nosave', 'nomat');  %Read for getting spike datanow
 else
-    if ~isempty(regexpi(input_data_file, '\.nex5'))
-        nexFileData = readNex5File(input_data_file);
-    else
+%     if ~isempty(regexpi(input_data_file, '\.nex5'))
+%         nexFileData = readNex5File(input_data_file);
+%     else
         nexFileData = readNexFile(input_data_file);
-    end
+%     end
     
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed
     nex_file_chanName_numbers = cellfun(@(x) str2double(x.name(regexp(x.name,'\d'))), nexFileData.neurons);
