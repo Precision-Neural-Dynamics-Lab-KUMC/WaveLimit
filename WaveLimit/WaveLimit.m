@@ -615,6 +615,8 @@ for k = 1:length(new_nexFileData.neurons)
     new_nexFileData.neurons{k}.name((end+1):64) = 0;  %Add null character to name to make 64 character string padded by nulls, important for reading back into plexon offline sorter
     new_nexFileData.waves{k}.name((end+1):64) = 0;
 end
+% save('SortedData.mat', 'new_nexFileData', '-v7.3'); %For debugging if
+% file saving issues
 if strcmp(output_data_file(end-4:end), '.nex5')  % save to nex5 file if assigned to, ZL 2019-11-24
     writeNex5File(new_nexFileData, output_data_file);
 else
