@@ -1,13 +1,15 @@
 %Example script to call WaveLimit
 %Adam Rouse, 5/30/19
 
-data_path = 'C:\DataFiles\';
+% data_path = 'C:\DataFiles\';
 % input_data_file = [data_path 'data_processed\monk_p\20160504_COT_precision\P_PlexonData_Centers\P_20170630_GHIJKLA+A_centers.nex'];
 % output_data_file = [data_path 'data_processed\monk_p\20160504_COT_precision\P_PlexonData_NewAutosort\P_20170630_GHIJKLA+A-Autosort_test2.nex'];
 
-input_data_file = [data_path 'data_processed\Nomad test\Trellis_Test\BB_to_Spikes\Q_20190627_arrayH_test.nex'];
-output_data_file = [data_path 'data_processed\Nomad test\Trellis_Test\BB_to_Spikes\Q_20190627_arrayH_test_auto.nex'];
+% input_data_file = [data_path 'data_processed\Nomad test\Trellis_Test\BB_to_Spikes\Q_20190627_arrayH_test.nex'];
+% output_data_file = [data_path 'data_processed\Nomad test\Trellis_Test\BB_to_Spikes\Q_20190627_arrayH_test_auto.nex'];
 
+input_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\Processed_Data\COTPerturb20210713\monk_A\BBtoSpikes\A_COTPerturb_Ped12_20210802_out.nex';
+output_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\Processed_Data\COTPerturb20210713\monk_A\Autosort\A_COTPerturb_Ped12_20210802_out_auto.nex';
 
 added_tools_path = 'C:\Users\arouse\Box\added_matlab_tools\';
 %Add Plexon offline SDK to path 

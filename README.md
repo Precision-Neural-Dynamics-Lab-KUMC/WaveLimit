@@ -1,7 +1,7 @@
 # WaveLimit
  Spike Sorting Software
 WaveLimit is automatic spike-sorting that runs in Matlab
-Created by Adam Rouse, v1.1, 11/1/19
+Created by Adam Rouse, v1.4, 9/28/22
 It uses an input *.plx, *.pl2, or *.nex file and returns a sorted *.nex file 
 An example call script is provided:  WaveLimit_example_call_script.m
 options can be specified in the options structure after it is created with default_options.m

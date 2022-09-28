@@ -8,7 +8,7 @@ function WaveLimit(input_data_file,output_data_file,options,channels_to_sort, st
 % options - spike sorting options (Default, options from function: default_options)
 % channels_to_sort - list of channels to be sorted (1 indexed) (Default, all channels)
 % strobeInfo - trial start and end event codes, necessary if only spikes during trials is included to accurately estimate the total time of the file
-% Adam Rouse 4/24/20, v1.3
+% Adam Rouse 9/28/22, v1.4
 
 
 if ~exist('writeNexFile', 'file')
