@@ -21,3 +21,7 @@ You can either add it permanantly or include it using the example calls in WaveL
 
 For reading native Plexon files you must have the OmniPlex and MAP Offline SDK Bundle
 https://plexon.com/software-downloads/#software-downloads-SDKs
+
+
+Current Release 1.4.0
+<a href="https://zenodo.org/badge/latestdoi/219063673"><img src="https://zenodo.org/badge/219063673.svg" alt="DOI"></a>
