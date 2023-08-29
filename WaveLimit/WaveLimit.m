@@ -8,21 +8,21 @@ function WaveLimit(input_data_file,output_data_file,options,channels_to_sort, st
 % options - spike sorting options (Default, options from function: default_options)
 % channels_to_sort - list of channels to be sorted (1 indexed) (Default, all channels)
 % strobeInfo - trial start and end event codes, necessary if only spikes during trials is included to accurately estimate the total time of the file
-% Adam Rouse 9/28/22, v1.4
+% Adam Rouse 8/29/2023, v1.5
 
 
-if ~exist('writeNexFile', 'file')
+if ~exist('writeNexFile', 'file') || ~exist('writeNex5File', 'file')
     error('AGRCodeError:pathError', 'No writeNexFile.m found, add HowToReadAndWriteNexAndNex5FilesInMatlab to path')
 end
 
 
-if ~isempty(regexpi(input_data_file, '\.nex'))
+if ~isempty(regexpi(input_data_file, '\.nex','once'))
     plx_file_flag = 0;
     nev_file_flag = 0;
-elseif ~isempty(regexpi(input_data_file, '\.plx')) || ~isempty(regexpi(input_data_file, '\.pl2'))
+elseif ~isempty(regexpi(input_data_file, '\.plx','once')) || ~isempty(regexpi(input_data_file, '\.pl2','once'))
     plx_file_flag = 1;
     nev_file_flag = 0;
-elseif ~isempty(regexpi(input_data_file, '\.nev')) 
+elseif ~isempty(regexpi(input_data_file, '\.nev','once')) 
     plx_file_flag = 0;
     nev_file_flag = 1;
 end
@@ -110,11 +110,11 @@ elseif nev_file_flag
     new_nexFileData.contvars = {};
     nevFileData = openNEV(input_data_file, 'nosave', 'nomat');  %Read for getting spike datanow
 else
-%     if ~isempty(regexpi(input_data_file, '\.nex5'))
-%         nexFileData = readNex5File(input_data_file);
-%     else
+    if ~isempty(regexpi(input_data_file, '\.nex5','once'))
+        nexFileData = readNex5File(input_data_file);
+    else
         nexFileData = readNexFile(input_data_file);
-%     end
+    end
     
     nex_file_chan_numbers = cellfun(@(x) x.wireNumber, nexFileData.neurons) + 1; %Nex file is zero indexed
     nex_file_chanName_numbers = cellfun(@(x) str2double(x.name(regexp(x.name,'\d'))), nexFileData.neurons);
@@ -488,7 +488,7 @@ for ch = 1:max_channels   %length(channels_to_sort)
         
     else   %if size(mean_waveforms,2)>0, no waveforms, don't assign new sortings
      
-        if options.keep_unsorted_ch_assignments && sum(unit_counts)>0 %Use previous sortings
+        if options.keep_unsorted_ch_assignments % && sum(unit_counts)>0 %Use previous sortings, Don't think second argument is needed, AGR, 9/2023
             if plx_file_flag
                 curr_orig_units = unique(cluster_indexes);
                 waveform_assignments{ch} = cluster_indexes;

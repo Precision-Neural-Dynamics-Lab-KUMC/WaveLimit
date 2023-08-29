@@ -45,9 +45,9 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
        
         % %              Calculate the Euclidean distance to
         distances = sqrt(sum((repmat(permute(waveforms, [3 2 1]), [size(test_mean_waveforms,2),1,1]) - repmat(permute(test_mean_waveforms, [2 3 1]), [1,size(waveforms,2),1])).^2,3));
-        %             distances(end+1,:) = sqrt(sum((permute(waveforms, [3 2 1]) - repmat(permute(noise_waveform, [2 3 1]), [1,size(waveforms,2),1])).^2,3)); %Also calculate the distance from the smallest amplitude waveform so waveforms closest to this noise is not included in calculating the covariance matrix below
-        % %             [min_distances,min_d] = min(distances,[],1);
-        %             distances = zeros(size(test_mean_waveforms,2),size(waveforms,2));  %Remove Euclidean distances and will be now replaced with Mahalanobis distance
+%                     distances(end+1,:) = sqrt(sum((permute(waveforms, [3 2 1]) - repmat(permute(noise_waveform, [2 3 1]), [1,size(waveforms,2),1])).^2,3)); %Also calculate the distance from the smallest amplitude waveform so waveforms closest to this noise is not included in calculating the covariance matrix below
+        %             [min_distances,min_d] = min(distances,[],1);
+%                     distances = zeros(size(test_mean_waveforms,2),size(waveforms,2));  %Remove Euclidean distances and will be now replaced with Mahalanobis distance
         %             %Calculate the Mahalanobis distance for each spike from the test cluster centers
         %             for n = 1:size(test_mean_waveforms,2)
         % %                 cov_matrix{n} = cov(waveforms(:,min_d==n & min_distances<(2*median(min_distances)))'); %Calculate covariance matrix (to be used for Mahalanobis distance) waveforms closest to each mean waveform
@@ -87,28 +87,28 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         cluster_order = gpuArray.zeros(size(sorted_distances));
         for n = 1:size(test_mean_waveforms,2)
             [sorted_distances(n,:), sort_order(n,:)] = sort(pen_distances(n,:),2);  %Sort the pen_distances to order waveforms by their distance from the test spike template
-            cluster_order(n,sort_order(n,:)) = 1:num_waveforms;
-        end
+            cluster_order(n,sort_order(n,:)) = gpuArray(1:num_waveforms);     
+        end     
         
         diff_sorted_distances = diff(sorted_distances,1,2);  %Calculate the rate change in distance with each successive spike
         [b,a] = butter(1,.001,'low');
-        smooth_diff_sorted_distances = filter(b,a,diff_sorted_distances')';  %Low-pass to improve estimating the minimum distance rate change
-        smooth_diff_sorted_distances(:,1:101) = gpuArray(pen_value);
+        %Low-pass to improve estimating the minimum distance rate change
+        smooth_diff_sorted_distances = filter(b,a,diff_sorted_distances,[],2);  %note, old code used transpose (') and had a weird, rare error where cluster_order changed with this line of code, some weird gpuArray bug that is hopfully fixed, AGR, 09/2023
+        smooth_diff_sorted_distances(:,1:101) = gpuArray(pen_value); %Don't find min value in this range
+        
         %Determine the mode of chi^2 distribution,
         %the point with minimum point of change for spike
         %distances from template (ie the maximum slope of chi^2 cdf or
         %peak of chi^2 pdf)
         min_point = gpuArray.zeros(size(num_possible_waveforms));
-            for n = 1:size(smooth_diff_sorted_distances,1)
-                if num_possible_waveforms(n)>0
+        for n = 1:size(smooth_diff_sorted_distances,1)
+            if num_possible_waveforms(n)>0
                 [~, min_point(n)] = min(smooth_diff_sorted_distances(n,1:num_possible_waveforms(n)));
-                else
-                    min_point(n) = 0;
-                end
+            else
+                min_point(n) = 0;
             end
-        
+        end
         min_point = min([num_possible_waveforms./2; min_point]);  %Make sure that it at most includes only half of all possible waveforms (real waveforms + outliers) for this cluster
-        
         %Set up an inverse chi^2 function that can be scaled to map a
         %cumulative probility to an expected distance value which
         %should be distributed like the distance values
@@ -279,6 +279,7 @@ else
     test_mean_waveforms = zeros(size(waveforms,1), 0);
     cutoff_distances = [];
 end
+
 end
 
 

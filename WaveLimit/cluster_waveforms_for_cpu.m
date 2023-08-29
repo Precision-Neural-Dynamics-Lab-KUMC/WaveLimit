@@ -84,7 +84,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         
         diff_sorted_distances = diff(sorted_distances,1,2);  %Calculate the rate change in distance with each successive spike
         [b,a] = butter(1,.001,'low');
-        smooth_diff_sorted_distances = filter(b,a,diff_sorted_distances')';  %Low-pass to improve estimating the minimum distance rate change
+        smooth_diff_sorted_distances = filter(b,a,diff_sorted_distances,[],2);  %Low-pass to improve estimating the minimum distance rate change
         smooth_diff_sorted_distances(:,1:101) = pen_value;
         %Determine the mode of chi^2 distribution,
         %the point with minimum point of change for spike
