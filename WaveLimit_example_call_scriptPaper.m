@@ -9,11 +9,13 @@ data_path = 'C:\DataFiles\';
 % input_data_file = [data_path 'data_processed\Nomad test\Trellis_Test\BB_to_Spikes\Q_20190627_arrayH_test.nex'];
 % output_data_file = [data_path 'data_processed\Nomad test\Trellis_Test\BB_to_Spikes\Q_20190627_arrayH_test_auto.nex'];
 
-input_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\Processed_Data\COTPerturb20210713\monk_A\BBtoSpikes\A_COTPerturb_Ped12_20210802_out.nex';
-output_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\Processed_Data\COTPerturb20210713\monk_A\Autosort\A_COTPerturb_Ped12_20210802_out_auto.nex';
+input_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\ArchivedProjects\SchieberLab\data_processed\monk_p\20160504_COT_precision\BB_to_Spikes\P_20170705_GHIJxxxx_BBout.nex';
+output_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\ArchivedProjects\SchieberLab\data_processed\monk_p\SpikeSortingPaper\P_20170705_GHIJxxxx_BB1-64_auto.nex';
+% input_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\Processed_Data\COTPerturb20210713\monk_A\BBtoSpikes\A_COTPerturb_Ped12_20210802_out.nex';
+% output_data_file = 'R:\SOM RSCH\RouseLab\DataFiles\Processed_Data\COTPerturb20210713\monk_A\Autosort\A_COTPerturb_Ped12_20210802_out_auto.nex';
 
 % Define paths to additional MATLAB tools
-added_tools_path = 'C:\Users\arouse\Box\added_matlab_tools\';
+added_tools_path = 'R:\SOM RSCH\RouseLab\LabWork\DataProcessing\DataProcessingToolboxes\';
 %Add Plexon offline SDK to path 
 addpath(genpath([added_tools_path 'Matlab Offline Files SDK\'])) 
 %Add Nex file reading/writing toolbox

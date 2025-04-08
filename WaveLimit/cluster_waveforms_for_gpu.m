@@ -1,63 +1,60 @@
 function [test_mean_waveforms,cutoff_distances] = cluster_waveforms_for_gpu(waveforms, timestamps, mean_waveforms, sorting_options, T, total_spikes)
-% function cluster_waveforms(waveforms, timestamps, mean_waveforms, sorting_options)
+% Clusters waveforms using GPU acceleration.
+% Inputs:
+% - waveforms: Matrix of waveforms to cluster.
+% - timestamps: Timestamps corresponding to waveforms.
+% - mean_waveforms: Initial mean waveforms for clustering.
+% - sorting_options: Options for clustering process.
+% - T: Total recording time.
+% - total_spikes: Total number of spikes (waveforms may be a subset for faster clustering).
 % Adam Rouse, 4/24/20, v1.3
 
+% Default options if not provided
 if nargin<4
     sorting_options = default_options();
 end
 if nargin<5 || isempty(T)
-    T = max(timestamps);  %If total time not specified, use maximum timestamp as total time
+    T = max(timestamps);  % Use maximum timestamp if total time not provided
 end
 if nargin<6 || isempty(total_spikes)
     total_spikes = size(waveforms,1);  %If total number spikes specifice, use number of waveforms;  There can be more total spikes if waveforms are only a subset (for speed of clustering)
 end
-min_ISI = .675;
+% Transfer data to GPU for faster computation
 timestamps = gpuArray(timestamps);
 waveforms = gpuArray(waveforms);
 [timestamps, sort_i] = sort(timestamps);  %Make sure time stamps are sorted
 waveforms = waveforms(:,sort_i);
 
 
-%If there are cluster centers labeled with mean_waveforms, then do the clustering
+% Ensure we proceed with clustering if mean waveforms are provided and enough waveforms exist
 [num_time_pts,num_waveforms] = size(waveforms);
 if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_waveforms
     
-    %Setup variables before iterating
+    % Initialization before clustering
     keep_iterating = true;
-    update_mean_flag = ones(size(mean_waveforms,2),1);  %Flag whether each identified unit should countinue to be updated for improved sorting
-    test_mean_waveforms = mean_waveforms;               %The new test mean waveform to try compared to the previous
-    old_best_true = gpuArray(zeros(size(mean_waveforms,2),1));    %Fraction of true waveforms to compare to from previous iterations, zero to start so first sorting will now be the best
+    update_mean_flag = ones(size(mean_waveforms,2),1);  % Track which clusters need updating
+    test_mean_waveforms = mean_waveforms;              % Initialize test mean waveforms
+    old_best_true = gpuArray(zeros(size(mean_waveforms,2),1));   % Best fraction of true waveforms from previous iterations, zero to start so first sorting will now be the best
     num_iter = 0;                                       %Iteration counter
-    multiunit_counter = zeros(size(mean_waveforms,2),1);
-    %Iterate through the clustering algorith by trying new cluster
-    %centers, each step the centers are updated, if the estimated
+    multiunit_counter = zeros(size(mean_waveforms,2),1); % Track clusters that may represent multiple units
+    
+    %Iterate through the clustering algorithm , each step the centers are updated, if the estimated
     %fraction of total waveforms improves, keep iterating, once it no
     %longer improves or gets worse, stop and go back to the last
     %cluster centers, the iteration continues until all of the clusters
     %have reached their local maximum
-    while(keep_iterating)
-        %Perform the iteration one last time after all of the cluster
-        %centers have been finalized to assign the final clusters
+    while keep_iterating
+
+        % Stop iterating when no clusters need further updating
         if (~any(update_mean_flag))
             keep_iterating = false;
         end
         
        
-        % %              Calculate the Euclidean distance to
+       % Calculate Euclidean distances between waveforms and cluster centers
         distances = sqrt(sum((repmat(permute(waveforms, [3 2 1]), [size(test_mean_waveforms,2),1,1]) - repmat(permute(test_mean_waveforms, [2 3 1]), [1,size(waveforms,2),1])).^2,3));
-%                     distances(end+1,:) = sqrt(sum((permute(waveforms, [3 2 1]) - repmat(permute(noise_waveform, [2 3 1]), [1,size(waveforms,2),1])).^2,3)); %Also calculate the distance from the smallest amplitude waveform so waveforms closest to this noise is not included in calculating the covariance matrix below
-        %             [min_distances,min_d] = min(distances,[],1);
-%                     distances = zeros(size(test_mean_waveforms,2),size(waveforms,2));  %Remove Euclidean distances and will be now replaced with Mahalanobis distance
-        %             %Calculate the Mahalanobis distance for each spike from the test cluster centers
-        %             for n = 1:size(test_mean_waveforms,2)
-        % %                 cov_matrix{n} = cov(waveforms(:,min_d==n & min_distances<(2*median(min_distances)))'); %Calculate covariance matrix (to be used for Mahalanobis distance) waveforms closest to each mean waveform
-        %                 differences = (waveforms'-repmat(test_mean_waveforms(:,n)',[size(waveforms,2),1]));
-        % %                 distances(n,:) = sum((differences/cov_matrix{n}).*differences,2); %Calculate the Mahalanobis distance
-        %                 distances(n,:) = sqrt(sum(differences.^2,2));
-        %             end
-        
-        
-        
+
+        % Penalize distances from non-closest clusters so waveform not included in any cluster but the closest
         pen_value = ceil(max(distances(:)));
         %Penalized distances adds pen_value to every distance that is not the
         %closest cluster center, for example if the distances for a spike
@@ -69,37 +66,36 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             pen_distances(n,min_d~=n) = distances(n,min_d~=n)+pen_value;
         end
         
-        %Number of waveforms that are closest to each cluster center, only
-        %these waveforms could potentially be in that cluster
+        % Determine number of waveforms closest to each cluster center
         num_possible_waveforms = histcounts(min_d, [0.5, (1:size(test_mean_waveforms,2))+0.5]);
         num_possible_waveforms(num_possible_waveforms == num_waveforms) = num_waveforms-1;  %To prevent a later error when there's only one cluster
+        
         %Calculate distance from a flat signal of zeros, no spikes farther
         %away then this should be included
         max_distances = sqrt(sum((test_mean_waveforms.^2)));
         for n = 1:length(num_possible_waveforms)
             num_possible_waveforms(n) = min(num_possible_waveforms(n), sum(pen_distances(n,:)<max_distances(n)));
         end
-        %Note orginally used the following but something weird happened
-        %where sort_order values were not unique for a given row
-        %[sorted_distances, sort_order] = sort(pen_distances,2)
+
+        % Set sorting and cluster order
         sorted_distances =  gpuArray.zeros(size(pen_distances));
         sort_order =  gpuArray.zeros(size(pen_distances));
         cluster_order = gpuArray.zeros(size(sorted_distances));
         for n = 1:size(test_mean_waveforms,2)
-            [sorted_distances(n,:), sort_order(n,:)] = sort(pen_distances(n,:),2);  %Sort the pen_distances to order waveforms by their distance from the test spike template
+            [sorted_distances(n,:), sort_order(n,:)] = sort(pen_distances(n,:),2);  %Order waveforms by their distance from the test spike template
             cluster_order(n,sort_order(n,:)) = gpuArray(1:num_waveforms);     
         end     
         
-        diff_sorted_distances = diff(sorted_distances,1,2);  %Calculate the rate change in distance with each successive spike
+        % Calculate the difference in sorted distances to estimate how many waveforms are in a  cluster using chi^2 statistics
+        diff_sorted_distances = diff(sorted_distances,1,2); 
         [b,a] = butter(1,.001,'low');
         %Low-pass to improve estimating the minimum distance rate change
-        smooth_diff_sorted_distances = filter(b,a,diff_sorted_distances,[],2);  %note, old code used transpose (') and had a weird, rare error where cluster_order changed with this line of code, some weird gpuArray bug that is hopfully fixed, AGR, 09/2023
-        smooth_diff_sorted_distances(:,1:101) = gpuArray(pen_value); %Don't find min value in this range
+        smooth_diff_sorted_distances = filter(b,a,diff_sorted_distances,[],2); % Low-pass filtering
+        smooth_diff_sorted_distances(:,1:101) = gpuArray(pen_value);  % Ignore the first 101 samples
         
-        %Determine the mode of chi^2 distribution,
-        %the point with minimum point of change for spike
-        %distances from template (ie the maximum slope of chi^2 cdf or
-        %peak of chi^2 pdf)
+        % Find the mode of the chi^2 distribution for each cluster by
+        % finding the minimum change in distance from one waveform distance
+        % to the next
         min_point = gpuArray.zeros(size(num_possible_waveforms));
         for n = 1:size(smooth_diff_sorted_distances,1)
             if num_possible_waveforms(n)>0
@@ -109,6 +105,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             end
         end
         min_point = min([num_possible_waveforms./2; min_point]);  %Make sure that it at most includes only half of all possible waveforms (real waveforms + outliers) for this cluster
+        
         %Set up an inverse chi^2 function that can be scaled to map a
         %cumulative probility to an expected distance value which
         %should be distributed like the distance values
@@ -118,7 +115,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         chi2_p_at_mode = chi2cdf(num_time_pts-2,num_time_pts); %The mode of the chi^2 distribution is at degrees of freedom - 2 (num_time_pts-2), use that to determine the cumulative probability at the mode
         est_25th = round((0.25/chi2_p_at_mode)*min_point);  %Use the estimated mode value, to determine how many waveforms make up 25th percentile of waveforms
         for n = 1:size(sorted_distances,1)  %For each unit
-            % x values go from 0 to 0.25 on the inverted cumulative probability curve
+            % x values go from 0 to 0.25 (percentile) on the inverted cdf
             x_values = linspace(0.25./est_25th(n), 0.25, est_25th(n));
             % y values are the distance values that were predicted to
             % be the 1st to 25th percentile for the given cluster
@@ -137,12 +134,11 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
                 chi2_sf(n) = 1000;
             end
         end
+        % Scale distances and compute cumulative probability using chi^2
         chi2_sf = sorting_options.scale_factor*chi2_sf;
-        %         toc; 5%
-        %Use scale factor to estimate the cumulative probability for
-        %each distance value
         chi2_cdf = chi2cdf(sorted_distances.*repmat(chi2_sf',1,size(sorted_distances,2)),num_time_pts);
         
+        %Estimate fraction of true spikes based on ISI violations
         fract_true_ISI = 0.5*gpuArray.ones(size(test_mean_waveforms,2),length(timestamps));  %Preallocate
         ISI_waveforms = gpuArray.false(size(test_mean_waveforms,2),length(timestamps));
         ISI = diff(timestamps);
@@ -150,14 +146,15 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
         for n = 1:size(test_mean_waveforms,2)
             %Find when each ISI violation occurs in the clusterning order for the current unit
             ISI_cluster_order = [cluster_order(n,[ISI_viol; false]); cluster_order(n,[false; ISI_viol])];
-            ISI_cluster_order = max(ISI_cluster_order, [], 1);
+            ISI_cluster_order = max(ISI_cluster_order, [], 1); %Always assumes the spike added later to the cluster is the ISI violation of the short interval pair
             ISI_cluster_order = unique(ISI_cluster_order);
             ISI_waveforms(n,ISI_cluster_order) = 1;
             cumsum_ISI_waveforms = cumsum(ISI_waveforms(n,:));
-            tmp = cumsum_ISI_waveforms.*T./(2.*(sorting_options.max_ISI-min_ISI).*(((total_spikes./length(cumsum_ISI_waveforms)).*(1:length(cumsum_ISI_waveforms))).^2)); %Part of fract ISI equation
+            tmp = cumsum_ISI_waveforms.*T./(2.*(sorting_options.max_ISI-sorting_options.min_ISI).*(((total_spikes./length(cumsum_ISI_waveforms)).*(1:length(cumsum_ISI_waveforms))).^2)); %Part of fract ISI equation
             fract_true_ISI(n,tmp<0.25) = sqrt(.25 - tmp(tmp<0.25))+.5;
         end
         
+        %Estimate fraction of true spikes based on chi^2 fit
         fract_true_chi2 = gpuArray(0.5*ones(size(test_mean_waveforms,2),length(timestamps)));  %Preallocate
         spike_prior = min_point./sum(min_point);  %Estimate prior probability of spike
         for n = 1:size(test_mean_waveforms,2)
@@ -170,8 +167,9 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             fract_true_chi2(n,:) = cumsum_chi2_pdf(n,:)./sum(cumsum_chi2_pdf,1);
         end
         
-        overall_fract_true = min(fract_true_ISI, fract_true_chi2);  %To be conservative, we're going to estimate the percentage of true waveforms as the minimum of either the percentage based on ISI violations or chi2 overlap (the case of one unit on a channel will only use ISI measure)
-        ratio_true_waveforms = chi2_cdf.*overall_fract_true;
+        %To be conservative, we're going to estimate the percentage of true waveforms as the minimum of either the percentage based on ISI violations or chi2 overlap (the case of one unit on a channel will only use ISI measure)
+        overall_fract_true = min(fract_true_ISI, fract_true_chi2);  
+        ratio_true_waveforms = chi2_cdf.*overall_fract_true;  %the phi value in the manuscript that should be maximized
         [new_best_true, cutoffs] = max(ratio_true_waveforms,[],2);
         cutoffs(cutoffs>num_possible_waveforms') = num_possible_waveforms(cutoffs'>num_possible_waveforms)';
         
@@ -199,13 +197,12 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
                     n_tot_spk = (total_spikes./length(timestamps))*n_spk ; %Correct for ISI based on total number of spikes
                     ISI = diff(sort(timestamps(cluster_order(n,1:(n_spk)))));
                     R = sum(ISI<sorting_options.max_ISI);
-                    tmp = R*T/(2*(sorting_options.max_ISI-min_ISI)*(n_tot_spk^2));
+                    tmp = R*T/(2*(sorting_options.max_ISI-sorting_options.min_ISI)*(n_tot_spk^2));
                     if tmp<0.25
                         overall_fract_true = sqrt(.25 - tmp) + .5;
                     else
                         overall_fract_true = 0.5;
                     end
-                    %                     new_best_true(n) = chi2_cdf(n,n_spk)./(2-overall_fract_true);
                     new_best_true(n) = chi2_cdf(n,n_spk).*overall_fract_true;
                     if multiunit_counter(n) >= sorting_options.max_multi_iterations  %Try to move characteristic waveform for only a few iterations if its always been multiunit anyways
                         update_mean_flag(n) = 0;
@@ -232,7 +229,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
                             mean_shortISIwaveforms(:,n) = mean(shortISIwaveforms,2);
                         end
                         
-                        
+                        %Update the test_mean_wavforms to try to move away from short ISI waveforms
                         if (update_mean_flag(n) == 1)
                             test_mean_waveforms(:,n) = gather(test_mean_waveforms(:,n) + (sorting_options.update_percentage/100)*(test_mean_waveforms(:,n)-mean_shortISIwaveforms(:,n)));
                         end
@@ -260,6 +257,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
                 end
             end
         end
+        %Display iteration
         num_iter = num_iter+1;
         display(['Number of iterations: ', num2str(num_iter)])
         if (num_iter>sorting_options.max_iterations)
@@ -267,6 +265,7 @@ if exist('mean_waveforms', 'var')  && num_waveforms > sorting_options.min_num_wa
             warning(['Max number of iterations (' num2str(sorting_options.max_iterations) ') completed'], 'User:cluster_waveforms')
         end
     end
+    %Organize the cutoff_distances to return
     cutoff_distances = zeros(size(new_cutoffs));
     for n = 1:length(new_cutoffs)
         if new_cutoffs(n)>0
@@ -286,7 +285,7 @@ end
 
 
 function SNR = signal2noise_PtoP2(waves)
-%Peak to Peak signal-to-noise divided by 2
+%Helper function, Peak to Peak signal-to-noise divided by 2
 mean_signal = mean(waves,2);
 signal = max(mean_signal) - min(mean_signal);
 remain_noise = waves-repmat(mean_signal, [1, size(waves,2)]);
