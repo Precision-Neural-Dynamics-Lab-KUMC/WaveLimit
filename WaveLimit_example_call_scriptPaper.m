@@ -37,7 +37,7 @@ options.SNR_minimum = 0;  % Set to 0 for no minimum SNR threshold
 options.include_multiunits = true;  % Save all units, including multi-units with ISI violations
 
 % Channels to sort: use an empty array to sort all available channels
-ch_to_sort = [];
+ch_to_sort =  14; %[];
 
 % Sorting method options
 options.use_existing_clusters = false;  % False: Use WaveLimit's cluster identification, True: use input file clusters

@@ -278,13 +278,13 @@ for ch = 1:max_channels  % Loop over all channels
                 rand_i = find(~ISI_viol); % Select legitimate spikes
                 rand_i = rand_i(randperm(length(rand_i),max_waveforms-num_ISI_viol)); % Randomly sample the remaining waveforms
                 rand_i = sort([rand_i; find(ISI_viol)]); % Combine with violations
-                tot_spikes = length(ISI_viol); % Total number of spikes
+                tot_spikes = length(ISI_viol); % Total number of spikes (actual total with both the subsample and those not looked at)
             elseif num_ISI_legit < (max_waveforms/2)  % Handle the rare case where most spikes are ISI violations
                 warning('Rare condition when num_ISI_legit<max_waveforms/2, while sum(unit_counts) > max_waveforms')
                 ISI_viol_i = find(ISI_viol); % Get indexes of violations 
                 ISI_viol_i = ISI_viol_i(randperm(length(ISI_viol_i), max_waveforms-num_ISI_legit)); % Sample from violations
                 rand_i = sort([ISI_viol_i; find(~ISI_viol)]); % Combine with legitimate spikes
-                tot_spikes = length(ISI_viol);
+                tot_spikes = length(ISI_viol); % Total number of spikes (actual total with both the subsample and those not looked at)
             else % Balance the selection between legitimate and ISI violation spikes
                 rand_i = find(~ISI_viol);
                 if ~isempty(rand_i)  %Prevent error in very rare occurence when all ISIs are less than options.max_ISI
@@ -367,7 +367,8 @@ for ch = 1:max_channels  % Loop over all channels
             end
             
             % Calculate distances between waveforms and cluster centers
-            distances = sqrt(sum((repmat(permute(aligned_waveforms, [3 2 1]), [size(test_mean_waveforms,2),1,1]) - repmat(permute(test_mean_waveforms, [2 3 1]), [1,size(aligned_waveforms,2),1])).^2,3));
+            % distances = sqrt(sum((repmat(permute(aligned_waveforms, [3 2 1]), [size(test_mean_waveforms,2),1,1]) - repmat(permute(test_mean_waveforms, [2 3 1]), [1,size(aligned_waveforms,2),1])).^2,3));
+            distances = sum((repmat(permute(aligned_waveforms, [3 2 1]), [size(test_mean_waveforms,2),1,1]) - repmat(permute(test_mean_waveforms, [2 3 1]), [1,size(aligned_waveforms,2),1])).^2,3);
             pen_value = ceil(max(distances(:)));  % Penalty value for distance
             %Penalized distances adds pen_value to every distance that is not the
             %closest cluster center, for example if the distances for a spike
