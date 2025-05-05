@@ -15,7 +15,7 @@ function WaveLimit(input_data_file, output_data_file, options,channels_to_sort, 
 % OUTPUT:
 % Output .nex file with sorted spike waveforms.
 %
-% Adam Rouse, 9/30/24, v1.6
+% Adam Rouse, 5/5/2025, v2.0
 % Comments and formatting added by Xavier Scherschligt, 10/9/24
 
 % Check if required function to write .nex files is in path

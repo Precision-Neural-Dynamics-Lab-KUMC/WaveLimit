@@ -1,7 +1,7 @@
 # WaveLimit
  Spike Sorting Software
 WaveLimit is automatic spike-sorting that runs in Matlab
-Created by Adam Rouse, v1.4, 9/28/22
+Created by Adam Rouse, v2.0, 5/5/2025
 It uses an input *.plx, *.pl2, or *.nex file and returns a sorted *.nex file 
 An example call script is provided:  WaveLimit_example_call_script.m
 options can be specified in the options structure after it is created with default_options.m
@@ -23,5 +23,3 @@ For reading native Plexon files you must have the OmniPlex and MAP Offline SDK B
 https://plexon.com/software-downloads/#software-downloads-SDKs
 
 
-Current Release 1.4.0
-<a href="https://zenodo.org/badge/latestdoi/219063673"><img src="https://zenodo.org/badge/219063673.svg" alt="DOI"></a>
