@@ -1,6 +1,6 @@
 function new_waveforms = perform_spike_alignment_for_cpu(waveforms)
-% perform_spike_alignment for WaveLimit, v1.3
-% Adam Rouse, 4/24/20
+% perform_spike_alignment for WaveLimit, v2.0
+% Adam Rouse, 8/5/25
 
 % function for aligning spikes based on the peak or trough of the spike
 % waveforms

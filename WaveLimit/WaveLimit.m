@@ -1,4 +1,4 @@
-function WaveLimit(input_data_file, output_data_file, options,channels_to_sort, strobeInfo)
+function version = WaveLimit(input_data_file, output_data_file, options,channels_to_sort, strobeInfo)
 % Spike sorting function to process .nex, .plx, or .nev files and output
 % a sorted .nex file with new sorting assignments.
 %
@@ -17,6 +17,11 @@ function WaveLimit(input_data_file, output_data_file, options,channels_to_sort, 
 %
 % Adam Rouse, 5/5/2025, v2.0
 % Comments and formatting added by Xavier Scherschligt, 10/9/24
+
+if strcmpi(input_data_file, 'ver')
+    version = '2.0';
+    return
+end
 
 % Check if required function to write .nex files is in path
 if ~exist('writeNexFile', 'file') || ~exist('writeNex5File', 'file')
@@ -406,7 +411,8 @@ for ch = 1:max_channels  % Loop over all channels
                         curr_diff_timestamps = diff(sort(timestamps(waveform_assignments{ch}==unique_cluster_indexes(u))));
                         % Expected number of short intervals (Poisson process model)
                         expected_not_long_intervals = length(curr_diff_timestamps)*(1-exp((-length(curr_diff_timestamps)/(1000*total_time))*options.long_interval_time));
-                        % Remove long-interval units if needed
+                            % Remove long interspike interval units if
+                            % useful for things like reward artefact or electrical stimulation removal
                         if options.remove_long_interval_units && (sum((1000*curr_diff_timestamps)<options.long_interval_time)/expected_not_long_intervals) < options.not_long_interval_fraction
                             waveform_assignments{ch}(waveform_assignments{ch}==unique_cluster_indexes(u)) = 0;
                         elseif options.remove_line_noise_units % Remove line noise-contaminated units
