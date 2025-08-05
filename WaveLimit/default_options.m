@@ -15,7 +15,7 @@ sorting_options.keep_analog = true;   %Keep analog channel data in .nex output f
 % Default sorting options for WaveLimit spike sorting
 sorting_options.max_ISI = 1.5;  %Maximum Interspike Interval time to be considered a violation in ms
 sorting_options.include_multiunits = true;  %Keep units even if less than 1/2 waveforms appear to come from a single neuron
-sorting_options.SNR_minimum = 0;
+sorting_options.SNR_minimum = 0; %Keep units only if their SNR is above a certain value
 
 
 
